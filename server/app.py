@@ -1005,6 +1005,50 @@ def version():
     }
 
 
+@app.get("/api/network")
+def network():
+    """局域网/远程访问信息（关于面板「手机访问」区块的数据源）。
+
+    --lan 启动时返回本机局域网 IP 与端口，手机/平板按显示地址直连；
+    未开局域网模式时 lan_mode=false，面板显示如何开启。
+    """
+    import socket
+
+    lan_mode = os.environ.get("RETOUCHLAB_LAN") == "1"
+    port = int(os.environ.get("RETOUCHLAB_PORT", "8765"))
+    ips = []
+    if lan_mode:
+        seen = set()
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("192.168.255.255", 1))
+                ips.append(s.getsockname()[0])
+            finally:
+                s.close()
+        except Exception:
+            pass
+        try:
+            for info in socket.getaddrinfo(socket.gethostname(), None,
+                                           socket.AF_INET):
+                ip = info[4][0]
+                if ip not in seen and not ip.startswith("127."):
+                    seen.add(ip)
+                    ips.append(ip)
+        except Exception:
+            pass
+    return {
+        "lan_mode": lan_mode,
+        "port": port,
+        "ips": ips,
+        "urls": ["http://%s:%d/" % (ip, port) for ip in ips],
+        "passwd_on": bool(_PASSWD),
+        # 口令本身只在 --lan 模式且设有口令时返回：该信息是给坐在本机
+        # 的管理员看的（远程请求要过口令闸，拿不到也无妨）
+        "passwd": _PASSWD if (lan_mode and _PASSWD) else "",
+    }
+
+
 def _parse_error_log(limit: int = 20):
     """解析 out/error.log，按 `==== 时间 METHOD 路径` 分段返回最近几条。
 

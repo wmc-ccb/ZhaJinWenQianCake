@@ -219,12 +219,28 @@ def main():
     ap = argparse.ArgumentParser(description="ZhaJinWenQianCake launcher")
     ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--host", default="127.0.0.1",
-                    help="服务监听地址（默认本机回环；局域网/隧道部署"
-                         "直接跑 uvicorn，不经本启动器）")
+                    help="服务监听地址（默认本机回环）")
+    ap.add_argument("--lan", action="store_true",
+                    help="手机/平板远程访问：服务绑 0.0.0.0，"
+                         "关于面板显示局域网地址")
     args = ap.parse_args()
 
     port, reusable = pick_port(args.port)
     url = "http://127.0.0.1:%d/" % port
+
+    # 手机/平板远程访问：--lan 时服务绑 0.0.0.0，并把端口/模式告诉
+    # 服务端（关于面板据此显示手机访问地址）。
+    # 安全：外网/局域网暴露必须带口令——未设置时自动生成随机口令并
+    # 记录（关于面板可见）。想固定口令就先设 RETOUCHLAB_PASSWD。
+    if args.lan:
+        os.environ["RETOUCHLAB_LAN"] = "1"
+        os.environ["RETOUCHLAB_PORT"] = str(port)
+        args.host = "0.0.0.0"
+        if not os.environ.get("RETOUCHLAB_PASSWD", "").strip():
+            import secrets
+            os.environ["RETOUCHLAB_PASSWD"] = "zc" + secrets.token_hex(3)
+            log("已自动生成访问口令（关于面板可查看）")
+        log("局域网模式：0.0.0.0（手机/平板可远程访问）")
 
     log("ZhaJinWenQianCake 启动中（Python %s）" % sys.version.split()[0])
     log("目录: %s" % ROOT)

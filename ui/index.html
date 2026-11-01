@@ -7871,6 +7871,8 @@ const ABOUT = {
         .then(d => { ABOUT.diag = d; }).catch(() => {}),
       fetch('/api/errors?limit=5').then(r => r.json())
         .then(d => { ABOUT.errors = d; }).catch(() => {}),
+      fetch('/api/network').then(r => r.json())
+        .then(d => { ABOUT.net = d; }).catch(() => {}),
     ];
     await Promise.all(jobs);
   },
@@ -7964,6 +7966,24 @@ const ABOUT = {
         : (d.gpu_works === false ? '<b style="color:var(--danger)">不可用</b> ' +
             (d.gpu_error || '').slice(0, 60) : '…');
       const errs = ((ABOUT.errors || {}).errors) || [];
+      // 手机/平板访问区块：局域网模式显示直连地址，否则显示开启方法
+      let netHtml;
+      const net = ABOUT.net;
+      if (net && net.lan_mode) {
+        netHtml = net.urls.map(u =>
+          '<div class="kv"><span style="grid-column:1/3"><a href="' + u +
+          '" target="_blank" style="color:var(--gold)">' + u +
+          '</a></span></div>').join('') +
+          '<div class="kv"><span style="grid-column:1/3">' +
+          (net.passwd ? '访问口令：<b style="color:var(--text)">' + net.passwd +
+           '</b>（手机首次打开需输入）' :
+           '提示：远程访问建议设置访问口令（RETOUCHLAB_PASSWD）') +
+          '</span></div>';
+      } else {
+        netHtml = '<div class="kv"><span style="grid-column:1/3">' +
+          '未开启。启动时加 --lan 参数（快捷方式目标后追加），' +
+          '手机连同一 Wi-Fi 即可远程修图</span></div>';
+      }
       card.innerHTML =
         '<h2>ZhaJinWenQianCake</h2>' +
         '<div class="kv">' +
@@ -7984,6 +8004,7 @@ const ABOUT = {
             ' · Python ' + (d.python || '…') + '</b>' +
           '<span>GPU</span><b>' + gpu + '</b>' +
         '</div>' +
+        '<h3>手机 / 平板访问</h3>' + netHtml +
         '<h3>最近错误' + (errs.length ? '（' + errs.length + '）' : '') + '</h3>' +
         (errs.length
           ? errs.map(e => '<div class="err">[' + e.time + ' ' + e.request +
