@@ -831,3 +831,18 @@ skin_gate/eyes/formula/hands_beach 全绿；超清 overlay/批量预解码/
 - 改善方向：用户精确涂鞋轮廓（消除笔现成）；genfill 复合羽化已在本轮
   加入；整图约束编辑模式（img2img 低重绘幅）可作后续功能。
 - 预设已沉淀进创成式填充面板（"运动鞋变光脚"），配合精细 mask 可用。
+
+
+### 模型下载改用户自选（2026-11-01，用户要求"可自己选择是否下载"）
+
+- 小窗改双按钮：「开始下载 / 暂不使用」。暂不使用 → 撤窗 + 停轮询 +
+  `rl_models_declined` 记录；之后点进「生成式」「AI色彩」分类自动重新
+  唤起小窗（removeItem + modelsBootPoll）。
+- 服务端行为不变：models_setup 下载只由 POST /api/models 触发；
+  automask 语义失败已优雅降级到几何蒙版，非 AI 功能完全不受影响。
+- 修正 manifest 两处：hand_landmarker.task 哈希/尺寸按实际下载文件
+  更新（早期记的是错误的 7894353B）；faceparsing 独立副本条目改
+  目录版（faceparsing/model.safetensors，与瘦身轮一致）。
+- fetch_flux 移除 subprocess.run 不支持的 flush 参数（后台跑必崩）。
+- choose-flow 全链 6 步实测：缺模型→小窗→跳过→declined 记录→
+  AI 分类重新唤起→点开始下载任务运行。
