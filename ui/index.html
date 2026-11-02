@@ -573,27 +573,33 @@
     background: var(--gold); margin-right: 6px; vertical-align: 1px; }
 
   /* ================= 首次初始化（模型下载） ================= */
-  /* 瘦发行版不含 980MB 模型：首次启动盖一层引导，下载完自动进入。
-     不依赖任何已载入的应用状态——模型没齐时应用本身也不该露脸。 */
-  #modelsBoot { position: fixed; inset: 0; background: var(--bg);
-    z-index: 120; display: flex; align-items: center; justify-content:center; }
-  #modelsBoot .card { width: min(460px, calc(100vw - 40px));
+  /* 瘦发行版不含 980MB 模型：首次启动用**右下角小窗**后台下载，
+     主界面照常可用（AI 功能等模型就绪后自动解锁）。
+     小窗可折叠成一行速览；完成后自动消失。 */
+  #modelsBoot { position: fixed; right: 12px; bottom: 12px; width: 320px;
     background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 26px 28px; }
-  #modelsBoot h2 { font-size: 17px; margin: 0 0 6px; color: var(--gold);
-    font-weight: 600; }
-  #modelsBoot .sub { color: var(--dim); font-size: 13px; line-height: 1.7; }
+    border-radius: 12px; padding: 12px 14px; z-index: 85;
+    box-shadow: 0 8px 28px rgba(0,0,0,.45); font-size: 12.5px; }
+  #modelsBoot .head { display: flex; align-items: center; gap: 8px;
+    cursor: pointer; user-select: none; }
+  #modelsBoot .head b { font-size: 13px; color: var(--gold); font-weight: 600;
+    flex: 1; }
+  #modelsBoot .head .tgl { color: var(--dim); font-size: 10px; }
+  #modelsBoot .body { margin-top: 10px; }
+  #modelsBoot.collapsed .body { display: none; }
+  #modelsBoot .sub { color: var(--dim); font-size: 12px; line-height: 1.6;
+    margin-bottom: 8px; }
   #modelsBoot .bar { height: 8px; background: var(--panel3);
-    border-radius: 4px; overflow: hidden; margin: 16px 0 8px; }
+    border-radius: 4px; overflow: hidden; margin: 10px 0 8px; }
   #modelsBoot .bar i { display: block; height: 100%; width: 0;
     background: var(--gold); transition: width .4s; }
   #modelsBoot .row { display: flex; justify-content: space-between;
     font-size: 12px; color: var(--dim); }
-  #modelsBoot button { width: 100%; margin-top: 16px; padding: 10px 0;
+  #modelsBoot button { width: 100%; margin-top: 12px; padding: 8px 0;
     border: none; border-radius: 8px; background: var(--gold);
-    color: #111; font-size: 14px; font-weight: 600; cursor: pointer; }
-  #modelsBoot .err { color: var(--danger); font-size: 12px;
-    margin-top: 10px; word-break: break-all; }
+    color: #111; font-size: 13px; font-weight: 600; cursor: pointer; }
+  #modelsBoot .err { color: var(--danger); font-size: 11px;
+    margin-top: 8px; word-break: break-all; }
 
   /* ================= 首次启动引导卡 ================= */
   #welcome { position: fixed; left: 16px; bottom: 16px; width: 300px;
@@ -1975,6 +1981,16 @@ document.addEventListener('pointerdown', ev => {
 
 function selectCat(key) {
   syncRailGroup(key);
+  // 进入 AI 相关分类而模型未齐且用户没拒绝过 → 重新唤起下载小窗
+  if (key === '生成式' || key === 'AI色彩') {
+    try {
+      if (localStorage.getItem('rl_models_declined') === '1') {
+        localStorage.removeItem('rl_models_declined');
+        MODELS_BOOT.started = false;
+        modelsBootPoll();
+      }
+    } catch (e) {}
+  }
   // rgroup 按钮的高亮由 syncRailGroup/markGroupActive 管理（它没有
   // dataset.cat，这里的 toggle(false) 会把刚加上的 active 抹掉）
   document.querySelectorAll('#rail .rbtn:not(.rgroup), #mbar button')
@@ -8093,10 +8109,11 @@ function showWelcomeOnce() {
 }
 
 // ============================================================
-// 首次初始化（瘦发行版）：模型没下齐时盖一层引导，下完自动进应用。
-// 全部完成前不渲染主界面——模型缺失的应用半瘫着露脸更让人慌。
+// 首次初始化（瘦发行版）：模型下载在**右下角小窗**后台进行。
+// 主界面照常可用——非 AI 功能不受下载影响；AI 功能等模型就绪后
+// 自动解锁。小窗可折叠成一行速览，完成后自动消失。
 // ============================================================
-const MODELS_BOOT = { timer: null, started: false };
+const MODELS_BOOT = { timer: null, started: false, collapsed: false };
 
 function modelsBootRender(st) {
   let card = document.getElementById('modelsBoot');
@@ -8104,24 +8121,56 @@ function modelsBootRender(st) {
     card = document.createElement('div');
     card.id = 'modelsBoot';
     card.innerHTML =
-      '<div class="card">' +
-      '<h2>炸金文谦蛋糕 · 首次初始化</h2>' +
-      '<div class="sub">这个安装包不含模型（下载更快）。' +
-      '首次使用需要联网下载约 <b>980 MB</b>，只此一次，之后完全离线。</div>' +
+      '<div class="head"><b>AI 模型下载</b>' +
+      '<span id="mbPct" style="font-size:11px;color:var(--dim)"></span>' +
+      '<span class="tgl" id="mbTgl">收起 ▾</span></div>' +
+      '<div class="body">' +
+      '<div class="sub">AI 功能需要联网下载约 <b>980 MB</b> 模型，' +
+      '只此一次，之后完全离线。<b>不下载则 AI 功能不可用</b>，' +
+      '其余功能照常。</div>' +
       '<div class="bar"><i id="mbBar"></i></div>' +
-      '<div class="row"><span id="mbInfo">…</span><span id="mbPct"></span></div>' +
-      '<button id="mbBtn">开始下载</button>' +
+      '<div class="row"><span id="mbInfo">…</span><span id="mbSize"></span>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:12px">' +
+      '<button id="mbBtn" style="flex:1">开始下载</button>' +
+      '<button id="mbSkip" style="flex:1;background:var(--panel3);' +
+      'color:var(--text)">暂不使用</button></div>' +
       '<div class="err" id="mbErr" style="display:none"></div>' +
       '</div>';
     document.body.appendChild(card);
+    document.getElementById('mbTgl').onclick = (e) => {
+      e.stopPropagation();
+      MODELS_BOOT.collapsed = !MODELS_BOOT.collapsed;
+      card.classList.toggle('collapsed', MODELS_BOOT.collapsed);
+      document.getElementById('mbTgl').textContent =
+        MODELS_BOOT.collapsed ? '展开 ▸' : '收起 ▾';
+      // 立即按当前状态重绘（折叠态的头部速览需要 MB 数字）
+      if (MODELS_BOOT.last_st) modelsBootRender(MODELS_BOOT.last_st);
+    };
     document.getElementById('mbBtn').onclick = () => {
       fetch('/api/models', { method: 'POST' }).then(modelsBootPoll)
         .catch(e => modelsBootShowErr(e.message));
     };
+    // 「暂不使用」：收窗并记住选择。之后点 AI 相关分类仍会重新唤起，
+    // 不影响其它功能照常使用。
+    document.getElementById('mbSkip').onclick = () => {
+      try { localStorage.setItem('rl_models_declined', '1'); } catch (e) {}
+      homeDismisslessClose();
+    };
   }
+  if (MODELS_BOOT.collapsed && st.phase !== 'error') {
+    // 折叠态只留一行速览
+    const mb = Math.round((st.bytes_done || 0) / 1048576);
+    card.querySelector('.head b').textContent =
+      'AI 模型下载 ' + (st.phase === 'running'
+        ? mb + 'MB' : '待开始');
+    return;
+  }
+  card.classList.remove('collapsed');
   const bar = document.getElementById('mbBar');
   const info = document.getElementById('mbInfo');
   const pct = document.getElementById('mbPct');
+  const size = document.getElementById('mbSize');
   const btn = document.getElementById('mbBtn');
   const err = document.getElementById('mbErr');
   const mb = Math.round((st.bytes_done || 0) / 1048576);
@@ -8132,11 +8181,13 @@ function modelsBootRender(st) {
     bar.style.width = p + '%';
     info.textContent = (st.current ? '正在下载 ' + st.current + ' · ' : '') +
       (st.done_files || 0) + '/' + (st.total_files || 0) + ' 个文件';
-    pct.textContent = mb + ' / ' + mt + ' MB (' + p + '%)';
+    pct.textContent = p + '%';
+    size.textContent = mb + ' / ' + mt + ' MB';
     btn.style.display = 'none';
   } else if (st.phase === 'done') {
     card.remove();
     clearTimeout(MODELS_BOOT.timer);
+    log('AI 模型下载完成，全部功能已就绪');
     return;
   } else if (st.phase === 'error') {
     bar.style.width = '0';
@@ -8151,9 +8202,11 @@ function modelsBootRender(st) {
     info.textContent = (st.installed || 0) + ' / ' + (st.total || 0) +
       ' 个模型就绪';
     pct.textContent = '';
+    size.textContent = '';
     btn.style.display = '';
     btn.textContent = '开始下载';
   }
+  MODELS_BOOT.last_st = st;
 }
 
 function modelsBootShowErr(msg) {
@@ -8161,10 +8214,21 @@ function modelsBootShowErr(msg) {
     bytes_total: 0, done_files: 0, total_files: 0 });
 }
 
+function homeDismisslessClose() {
+  // 「暂不使用」：撤窗 + 停轮询。AI 分类可再次唤起。
+  const h = document.getElementById('modelsBoot');
+  if (h) h.remove();
+  clearTimeout(MODELS_BOOT.timer);
+}
+
 function modelsBootPoll() {
+  // 用户已选「暂不使用」→ 不自动弹窗也不自动下载；点进 AI 分类时
+  // 由 modelsBootMaybeShow 重新唤起。
+  let declined = false;
+  try { declined = localStorage.getItem('rl_models_declined') === '1'; } catch (e) {}
   fetch('/api/models').then(r => r.json()).then(st => {
     if (!st || st.total === undefined) return;   // 端点异常：不挡应用
-    // 模型已齐就撤引导层——**不能只认 phase==='done'**：服务重启后
+    // 模型已齐就撤小窗——**不能只认 phase==='done'**：服务重启后
     // 状态回到 idle（没有下载任务在跑），已装满的机器会卡在引导层
     // 挡住整个界面（截图审计抓到的真 bug）。
     if (st.installed >= st.total) {
@@ -8173,12 +8237,14 @@ function modelsBootPoll() {
       clearTimeout(MODELS_BOOT.timer);
       return;
     }
-    modelsBootRender(st);
-    // idle 且还没自动开过 → 自动开下，省一次点击
-    if (st.phase === 'idle' && !MODELS_BOOT.started && st.installed < st.total) {
-      MODELS_BOOT.started = true;
-      fetch('/api/models', { method: 'POST' }).catch(() => {});
+    // 用户选过「暂不使用」且没有下载任务在跑 → 不打扰，静默结束
+    if (declined && st.phase !== 'running') {
+      const card = document.getElementById('modelsBoot');
+      if (card) card.remove();
+      clearTimeout(MODELS_BOOT.timer);
+      return;
     }
+    modelsBootRender(st);
     clearTimeout(MODELS_BOOT.timer);
     MODELS_BOOT.timer = setTimeout(modelsBootPoll, st.phase === 'running' ? 800 : 2000);
   }).catch(() => { /* 轮询失败下轮再试 */ });
