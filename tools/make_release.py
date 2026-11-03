@@ -104,7 +104,13 @@ def zip_version(variant: str) -> str:
                        % (read_version(), variant))
     if os.path.exists(out):
         os.remove(out)
-    run(["tar", "-a", "-c", "-f", out, "ZhaJinWenQianCake"],
+    # 必须用 bsdtar + 显式 --format zip：PATH 里的 Git Bash GNU tar 不支持
+    # zip 格式，`-a` 会静默 fallback 成 ustar（扩展名却是 .zip，解不开——
+    # 2026-11-04 验收抓到过这个坑）。
+    tar_exe = r"C:\Windows\System32\tar.exe"
+    if not os.path.exists(tar_exe):
+        tar_exe = "tar"
+    run([tar_exe, "--format", "zip", "-c", "-f", out, "ZhaJinWenQianCake"],
         cwd=DIST_DIR)
     print("[zip] %s (%.2f GB)" % (os.path.basename(out),
                                   os.path.getsize(out) / 1024 ** 3))
