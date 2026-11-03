@@ -119,7 +119,8 @@ def main():
                       {"tree": tree_items})
     raw_commit = subprocess.run(
         ["git", "cat-file", "commit", "HEAD"],
-        capture_output=True, text=True, check=True).stdout
+        capture_output=True, text=True, check=True,
+        encoding="utf-8", errors="replace").stdout
     header, _, message = raw_commit.partition("\n\n")
     meta = {}
     for line in header.splitlines():
