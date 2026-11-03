@@ -119,10 +119,21 @@ async def _passwd_gate(request, call_next):
         #   3) ?k=口令 —— 微信/App 内置浏览器不弹登录框，用这个进
         # 本机回环免密：同机浏览器/进程就是本人；公网与局域网设备
         # 的源 IP 不是回环，仍然必须带凭证。
+        # **例外（隧道流量）**：内置外网隧道（cloudflared）转发来的远程
+        # 请求源 IP 也是回环——但必带 Cloudflare 的 cf-connecting-ip 头。
+        # 检测到它就按远程设备处理（强制口令），否则任何拿到公网
+        # 隧道链接的人都能绕过口令闸（安全审计结论）。
         client = getattr(request, "client", None)
         host = getattr(client, "host", "") if client else ""
-        if host in ("127.0.0.1", "::1", "localhost"):
+        via_tunnel = "cf-connecting-ip" in request.headers
+        if host in ("127.0.0.1", "::1", "localhost") and not via_tunnel:
             return await call_next(request)
+        if via_tunnel and not _PASSWD:
+            # 隧道开启但没设口令：拒绝并说明（tunnel 启动逻辑会保证
+            # 有口令，这里是兜底）
+            return JSONResponse({"detail": "外网访问未启用口令保护，"
+                                 "已在面板关闭外网链接。请在本机重新生成。"},
+                                 status_code=503)
 
         ticket = hashlib.sha256(
             ("retouchlab-v1:" + _PASSWD).encode()).hexdigest()[:32]
@@ -1047,6 +1058,35 @@ def network():
         # 的管理员看的（远程请求要过口令闸，拿不到也无妨）
         "passwd": _PASSWD if (lan_mode and _PASSWD) else "",
     }
+
+
+# ---- 外网隧道（TryCloudflare）：一键临时公网链接 ------------------------
+@app.get("/api/tunnel/status")
+def tunnel_status():
+    from engine import tunnel
+    return JSONResponse(tunnel.status())
+
+
+@app.post("/api/tunnel/start")
+def tunnel_start():
+    """启动外网隧道：cloudflared 缺失自动下载；链接在 status.url。
+
+    安全：隧道开启必须带口令——未设置时自动生成随机口令（本机
+    关于面板可见），远程访问强制要求。
+    """
+    from engine import tunnel
+    import secrets
+
+    if not os.environ.get("RETOUCHLAB_PASSWD", "").strip():
+        os.environ["RETOUCHLAB_PASSWD"] = "zc" + secrets.token_hex(3)
+    tunnel.start()
+    return JSONResponse(tunnel.status())
+
+
+@app.post("/api/tunnel/stop")
+def tunnel_stop():
+    from engine import tunnel
+    return JSONResponse(tunnel.stop())
 
 
 def _parse_error_log(limit: int = 20):

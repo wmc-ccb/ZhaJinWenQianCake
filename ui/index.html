@@ -7889,6 +7889,8 @@ const ABOUT = {
         .then(d => { ABOUT.errors = d; }).catch(() => {}),
       fetch('/api/network').then(r => r.json())
         .then(d => { ABOUT.net = d; }).catch(() => {}),
+      fetch('/api/tunnel/status').then(r => r.json())
+        .then(d => { ABOUT.tunnel = d; }).catch(() => {}),
     ];
     await Promise.all(jobs);
   },
@@ -8000,6 +8002,26 @@ const ABOUT = {
           '未开启。启动时加 --lan 参数（快捷方式目标后追加），' +
           '手机连同一 Wi-Fi 即可远程修图</span></div>';
       }
+      // 外网隧道（试验）：一键临时公网链接，外地手机也能访问
+      let tunHtml;
+      const tun = ABOUT.tunnel;
+      if (tun && tun.phase === 'running' && tun.url) {
+        tunHtml = '<div class="kv"><span style="grid-column:1/3">' +
+          '<a href="' + tun.url + '" target="_blank" style="color:var(--gold)">' +
+          tun.url + '</a></span></div>' +
+          '<div class="kv"><span style="grid-column:1/3">' +
+          '口令：' + (ABOUT.net && ABOUT.net.passwd ? ABOUT.net.passwd : '见上') +
+          ' · 链接临时，重启后需重新生成</span></div>';
+      } else if (tun && tun.phase === 'starting') {
+        tunHtml = '<div class="kv"><span style="grid-column:1/3">正在生成外网链接…</span></div>';
+      } else if (tun && tun.phase === 'error') {
+        tunHtml = '<div class="kv"><span style="grid-column:1/3" style="color:var(--danger)">生成失败：' +
+          (tun.error || '').slice(0, 80) + ' <button class="chip" id="tunRetry">重试</button></span></div>';
+      } else {
+        tunHtml = '<div class="kv"><span style="grid-column:1/3">' +
+          '<button class="chip" id="tunGo">生成外网链接（试验）</button> ' +
+          '任何人拿到链接+口令都能访问，用完即关</span></div>';
+      }
       card.innerHTML =
         '<h2>ZhaJinWenQianCake</h2>' +
         '<div class="kv">' +
@@ -8021,6 +8043,7 @@ const ABOUT = {
           '<span>GPU</span><b>' + gpu + '</b>' +
         '</div>' +
         '<h3>手机 / 平板访问</h3>' + netHtml +
+        tunHtml +
         '<h3>最近错误' + (errs.length ? '（' + errs.length + '）' : '') + '</h3>' +
         (errs.length
           ? errs.map(e => '<div class="err">[' + e.time + ' ' + e.request +
@@ -8030,6 +8053,15 @@ const ABOUT = {
           '<button id="abCopy">复制诊断报告</button>' +
           '<button id="abOk" class="primary">关闭</button>' +
         '</div>';
+      const tunGo = document.getElementById('tunGo');
+      if (tunGo) tunGo.onclick = () => {
+        tunGo.disabled = true; tunGo.textContent = '生成中…';
+        fetch('/api/tunnel/start', { method: 'POST' })
+          .then(() => { ABOUT.load(); setTimeout(() => ABOUT.show(), 4000); })
+          .catch(e => { tunGo.disabled = false; tunGo.textContent = '生成失败，点重试'; });
+      };
+      const tunRetry = document.getElementById('tunRetry');
+      if (tunRetry) tunRetry.onclick = () => { ABOUT.load(); setTimeout(() => ABOUT.show(), 3000); };
       $('abOk').onclick = () => ABOUT.close();
       $('abCopy').onclick = async () => {
         const text = ABOUT.reportText();
