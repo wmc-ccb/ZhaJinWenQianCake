@@ -846,3 +846,22 @@ skin_gate/eyes/formula/hands_beach 全绿；超清 overlay/批量预解码/
 - fetch_flux 移除 subprocess.run 不支持的 flush 参数（后台跑必崩）。
 - choose-flow 全链 6 步实测：缺模型→小窗→跳过→declined 记录→
   AI 分类重新唤起→点开始下载任务运行。
+
+### 终验抓出三个发布/工具链 bug（2026-11-04）
+
+- **CI 红灯（连挂 3 轮）**：models-v1 Release 资产名 `faceparsing.safetensors`
+  与下载规则 `path.replace("/","_")` 拼出的 `faceparsing_model.safetensors`
+  不一致 → CI 下载 404。修复：资产 API 改名（PATCH release asset，不重传
+  338MB），rerun 后 CI success。
+- **tar 劫持**：make_release.py 用 `tar -a` 打 zip，PATH 前面的 Git Bash
+  GNU tar 不支持 zip 格式，`-a` **静默 fallback 成 ustar**——文件名却叫
+  .zip（头 4 字节 "ZhaJ"=目录名 ASCII）。Release 上挂的切分卷是早期
+  bsdtar 打的真 zip（5 卷 SHA 全 OK，用户侧无损）。修复：显式
+  `C:\Windows\System32\tar.exe --format zip`；本地整包 full/lite 已重打
+  验证（PK 头，3505/3490 条目，full 含模型、lite 无模型含 manifest）。
+- **git_backup_push GBK 崩溃**：`git cat-file commit HEAD` 的中文 message
+  在 Windows 默认 GBK locale 下 reader 线程 UnicodeDecodeError →
+  stdout=None。修复：subprocess.run 显式 `encoding="utf-8"`。修复本身
+  已入库并推送（200/200 blob）。
+- 其余全绿：打包版活性 4 端点、hands_beach 19/19、UI 特征全在
+  （隧道/引导小窗/二级菜单/120 控件）、AI 服务 SKIPPED 符合预期。
