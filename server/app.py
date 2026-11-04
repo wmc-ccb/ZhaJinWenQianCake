@@ -1451,7 +1451,11 @@ class UpscaleRequest(BaseModel):
 
 
 # 超清任务表：100-150 秒的重活必须有进度，否则用户以为死机。
-_UPSCALE_JOBS: Dict[str, dict] = {}
+_UPSCALE_JOBS: "OrderedDict[str, dict]" = OrderedDict()
+# OrderedDict 而非 dict：LRU 裁剪用 popitem(last=False)（最旧任务先出，
+# 只留最近 4 个）。普通 dict 的 popitem() 无 last 参数——popitem(last=...)
+# 只有 OrderedDict 支持，普通 dict 上这一行在任务数超过 4 时直接 500
+# （十轮压测 E 阶段抓到，单点复现确认；此前 LRU>4 分支零测试覆盖）。
 _UPSCALE_JOBS_LOCK = threading.Lock()
 
 
@@ -2000,6 +2004,35 @@ def idphoto(req: IdPhotoRequest):
         "path": path, "committed": bool(req.commit)})
 
 
+@app.post("/api/passersby_detect")
+def passersby_detect(req: dict = Body(...)):
+    """AI 祛路人·第一步：只检测不填充.
+
+    返回背景路人的归一化框（x0,y0,x1,y1）+ 置信分。前端画红框覆盖层，
+    用户点名保留谁（exclude）后再调 /api/remove_passersby——对齐像素
+    蛋糕"AI 检测出红遮罩 -> 编辑选区 -> 生成"的两段式流程。
+    """
+    from engine import passersby as PB
+
+    s = _get_session(req.get("session") or "")
+    people, subj, subject_box = PB.find_passersby(s["preview"])
+    h, w = s["preview"].shape[:2]
+    boxes = []
+    for p in people:
+        bx = p["box"]
+        boxes.append({
+            "box": [round(bx[0] / w, 4), round(bx[1] / h, 4),
+                    round(bx[2] / w, 4), round(bx[3] / h, 4)],
+            "score": round(float(p.get("score", 0)), 3)})
+    if subject_box:
+        sbx = subject_box
+        boxes.append({"subject": True,
+                      "box": [round(sbx[0] / w, 4), round(sbx[1] / h, 4),
+                              round(sbx[2] / w, 4), round(sbx[3] / h, 4)],
+                      "score": 1.0})
+    return JSONResponse({"boxes": boxes, "passers": len(people)})
+
+
 @app.post("/api/remove_passersby")
 def do_remove_passersby(req: dict = Body(...)):
     """AI 祛路人：把背景里的人抹掉.
@@ -2007,6 +2040,7 @@ def do_remove_passersby(req: dict = Body(...)):
     双尺度人脸检测找路人 -> 主体重叠判定 -> 头身比例掩膜 + 强制主体
     保护匁-> 填充。`model`：lama（快 ~5s）或 sdxl（质釁~40s，复杁
     背景明显更干净，需要ComfyUI 在8388 运行；失败自动回落 lamaa）、
+    `exclude`：归一化框列表——用户在前端点名保留的路人（两段式）。
     """
     from engine import passersby as PB
 
@@ -2016,8 +2050,13 @@ def do_remove_passersby(req: dict = Body(...)):
     # 掩膜里倾向画出替代的假人（实测合影发明了两个路人）。sdxl 档保畁
     # 给大区域重造场景的用法、
     model = str(req.get("model") or "lama")
+    exclude = req.get("exclude") or []
+    if not isinstance(exclude, list):
+        raise HTTPException(400, "exclude 必须是框列表")
+    exclude = [e for e in exclude
+               if isinstance(e, (list, tuple)) and len(e) == 4]
     out, info = PB.remove_passersby(s["preview"], strength=strength,
-                                    model=model)
+                                    model=model, exclude=exclude)
     if req.get("commit", False) and info.get("removed", 0) > 0:
         _commit(s, out, "AI 祛路人")
     return JSONResponse({
@@ -2214,6 +2253,7 @@ class BgCleanRequest(BaseModel):
 class BgReplaceRequest(BaseModel):
     session: str
     colour: List[float] = [1.0, 1.0, 1.0]   # 目标背景艁RGB
+    bg_png: Optional[str] = None            # 自定义背景图（base64 PNG/JPEG）
     feather: float = 1.5
     keep_lighting: bool = True     # 保留原背景的明暗关系
     commit: bool = True
@@ -2791,7 +2831,42 @@ def do_bgreplace(req: BgReplaceRequest):
 
     colour = np.clip(np.array(req.colour, np.float32), 0, 1).reshape(1, 1, 3)
     newbg = np.tile(colour, img.shape[:2] + (1,))
-    if req.keep_lighting:
+    if req.bg_png:
+        # 自定义图片背景（对齐像素蛋糕「我的背景」：用户自己带素材，
+        # 项目零素材立场不变）。cover-fit 铺满 + 前景边缘羽化融合。
+        import cv2 as _cv2
+        try:
+            raw = base64.b64decode(req.bg_png)
+            arr = np.frombuffer(raw, np.uint8)
+            if arr.size == 0:
+                raise HTTPException(400, "bg_png 为空")
+            bgimg = _cv2.imdecode(arr, _cv2.IMREAD_COLOR)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "bg_png 不是合法的 base64/图片")
+        if bgimg is None or bgimg.ndim != 3:
+            raise HTTPException(400, "背景图解码失败")
+        bgimg = _cv2.cvtColor(bgimg, _cv2.COLOR_BGR2RGB)
+        bgimg = np.asarray(bgimg, np.float32) / 255.0
+        # 先 cover-fit 到原图尺寸，再做明暗融合——融合系数是逐像素的
+        # 原图亮度，必须与背景图同形（冒烟抓到的顺序 bug）。
+        sh, sw = bgimg.shape[:2]
+        h, w = img.shape[:2]
+        scale = max(w / sw, h / sh)
+        nw, nh = max(1, int(round(sw * scale))), max(1, int(round(sh * scale)))
+        bgimg = _cv2.resize(bgimg, (nw, nh), interpolation=_cv2.INTER_AREA)
+        x0, y0 = max(0, (nw - w) // 2), max(0, (nh - h) // 2)
+        newbg = np.ascontiguousarray(bgimg[y0:y0 + h, x0:x0 + w])
+        if req.keep_lighting:
+            lum = luminance(img)[..., None]
+            bgsel = a[..., 0] < 0.5
+            if bgsel.sum() > 100:
+                base = float(np.median(lum[bgsel]))
+                rel = np.clip(lum / max(base, 1e-3), 0.6, 1.4)
+                newbg = np.clip(newbg * rel, 0, 1)
+        info["bg_source"] = "image"
+    elif req.keep_lighting:
         # 原背景的亮度起伏（去掉均值）乘到新颜色上：保留打光感
         lum = luminance(img)[..., None]
         bgsel = a[..., 0] < 0.5
@@ -3633,6 +3708,7 @@ class BatchRequest(BaseModel):
     size_w: int = 0                   # 尺寸模板：0 = 原尺寸
     size_h: int = 0
     format: str = "jpg"               # jpg | png | tiff
+    actions: Optional[List[str]] = None   # 批量动作: passersby | rigfix
 
 
 @app.post("/api/batch")
@@ -3706,6 +3782,19 @@ def batch_start(req: BatchRequest):
                                             pipeline=_pipe)
         else:
             out, _info = _pipe.run(src, params, detect=True)
+
+        # 批量动作（对齐像素蛋糕「批量配方祛路人」）：参数渲染之后、
+        # 尺寸/水印之前执行。动作是内容感知操作，失败不炸整批。
+        for act in (req.actions or []):
+            try:
+                if act == "passersby":
+                    from engine import passersby as PB
+                    out, _ai = PB.remove_passersby(out, model="lama")
+                elif act == "rigfix":
+                    from engine import rigfix as RF
+                    out, _ri = RF.remove_rig(out)
+            except Exception as _ae:
+                _ai = {"error": str(_ae)[:120]}
 
         # 尺寸模板：等比缩放到目标框（长边贴合），透明填充不裁切
         if req.size_w and req.size_h:

@@ -80,7 +80,7 @@ def find_passersby(img: np.ndarray
             bx = [float(v) / (s * k) for v in f.box]
             raw.append((bx, float(getattr(f, "score", 0.5) or 0.5)))
     if not raw:
-        return [], None
+        return [], None, None      # 与主 return 同形：路人/主体掩膜/主体框
 
     # 框级去重：IoU > 0.6 视为同一张脸
     raw.sort(key=lambda t: -(t[0][2] * t[0][3]))
@@ -239,8 +239,26 @@ def _passerby_mask_precise(img: np.ndarray, box, clothes: np.ndarray
     return np.clip(m, 0, 1)
 
 
+def _norm_box(bx) -> Tuple[float, float, float, float]:
+    """框 -> 归一化 (x0, y0, x1, y1)，供前端覆盖层与 exclude 匹配用。"""
+    return (float(bx[0]), float(bx[1]), float(bx[2]), float(bx[3]))
+
+
+def _overlaps(nb, ex, thr=0.35) -> bool:
+    """归一化框 nb 与排除框 ex 的交并比（对较小框的交占比）> thr。"""
+    ix0, iy0 = max(nb[0], ex[0]), max(nb[1], ex[1])
+    ix1, iy1 = min(nb[2], ex[2]), min(nb[3], ex[3])
+    if ix1 <= ix0 or iy1 <= iy0:
+        return False
+    inter = (ix1 - ix0) * (iy1 - iy0)
+    small = min((nb[2] - nb[0]) * (nb[3] - nb[1]),
+                (ex[2] - ex[0]) * (ex[3] - ex[1]))
+    return small > 0 and inter / small > thr
+
+
 def remove_passersby(img: np.ndarray, strength: float = 1.0,
-                     max_people: int = 6, model: str = "lama"
+                     max_people: int = 6, model: str = "lama",
+                     exclude: Optional[List[List[float]]] = None
                      ) -> Tuple[np.ndarray, dict]:
     """把背景里的人抹掉，返回 (图, 统计).
 
@@ -248,13 +266,28 @@ def remove_passersby(img: np.ndarray, strength: float = 1.0,
     它不懂"人走了之后这里应该是什么"）或 **sdxl**（质量 ~30-60s，扩散
     模型真理解语义，复杂背景明显更干净；需要 ComfyUI 在 8388 运行）。
     sdxl 失败自动回落 lama，info["model"] 记录实际用的那个。
+
+    `exclude`：归一化框列表——用户在前端看到检测框后点名"这个人要保留"。
+    匹配规则：检出框与排除框的交占检出框面积 >35% 视为同一人，跳过。
+    info["excluded"] 记录被保留的人数，info["boxes"] 只含真正要抹的。
     """
     out = np.asarray(img, np.float32).copy()
     people, subj, subject_box = find_passersby(out)
+    excl = [tuple(e) for e in (exclude or [])]
+    kept = []
+    n_excluded = 0
+    for p in people:
+        nb = _norm_box(p["box"])
+        if any(_overlaps(nb, e) for e in excl):
+            n_excluded += 1
+            continue
+        kept.append(p)
     info = {"detected": len(people) + 1, "removed": 0,
-            "boxes": [p["box"] for p in people], "model": model}
+            "excluded": n_excluded,
+            "boxes": [_norm_box(p["box"]) for p in kept], "model": model}
+    people = kept
     if not people or strength <= 0:
-        return np.clip(out, 1) if False else np.clip(out, 0, 1), info
+        return np.clip(out, 0, 1), info
 
     h, w = out.shape[:2]
     hole = np.zeros((h, w), np.float32)

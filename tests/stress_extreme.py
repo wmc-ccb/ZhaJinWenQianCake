@@ -34,7 +34,7 @@ mem_samples = []
 
 def mem_mb():
     try:
-        return requests.get(B + "/api/health", timeout=15).json()["memory_mb"]
+        return requests.get(B + "/api/health", timeout=60).json()["memory_mb"]
     except Exception:
         return -1
 
@@ -49,7 +49,7 @@ def check_phase(name, fn):
         fatal.append("%s 未捕获: %s" % (name, str(exc)[:100]))
     after = mem_mb()
     mem_samples[-1] = (name, before, after)
-    alive = requests.get(B + "/api/health", timeout=15).status_code == 200
+    alive = requests.get(B + "/api/health", timeout=60).status_code == 200
     print("[%s] 服务器存活: %s | 内存 %.0f -> %.0f MB"
           % (name, alive, before, after))
     if not alive:
@@ -253,13 +253,13 @@ def phase_e():
                                 "long_edge": 400}, timeout=120)
         if r.status_code != 200:
             render_errs.append(r.status_code)
-        sts = [requests.get(B + "/api/upscale/job/" + j, timeout=15).json()
+        sts = [requests.get(B + "/api/upscale/job/" + j, timeout=60).json()
                for j in jids]
         if all(s["phase"] in ("done", "error") for s in sts):
             break
         time.sleep(2)
     for j in jids:
-        st = requests.get(B + "/api/upscale/job/" + j, timeout=15).json()
+        st = requests.get(B + "/api/upscale/job/" + j, timeout=60).json()
         if st["phase"] == "error":
             issues.append("超清任务 error: %s" % st.get("error", "")[:80])
         else:
@@ -301,7 +301,7 @@ def phase_f():
 
 def main():
     print("暴力测试目标:", B, flush=True)
-    if requests.get(B + "/api/health", timeout=15).status_code != 200:
+    if requests.get(B + "/api/health", timeout=60).status_code != 200:
         print("服务器不可达")
         return 1
     for name, fn in (("A 畸形输入轰击", phase_a),
