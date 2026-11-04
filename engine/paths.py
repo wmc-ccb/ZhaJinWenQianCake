@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""资源路径解析：同时支持「源码运行」和「PyInstaller 打包运行」。
+r"""资源路径解析：同时支持「源码运行」和「PyInstaller 打包运行」。
 
 两种运行方式的目录结构完全不同：
 
@@ -21,6 +21,15 @@
   3. 用户想换模型/加模型时直接拷文件就行，不用重新打包
 
 环境变量 RETOUCHLAB_HOME 可覆盖运行时根目录（便携 U 盘场景）。
+
+第三种形态：MSIX / Microsoft Store 包
+  <pkg>\ZhaJinWenQianCake.exe   <- 只读（C:\Program Files\WindowsApps\...）
+  <pkg>\ui\ ...                 <- 只读资源
+  %LOCALAPPDATA%\ZhaJinWenQianCake\   <- 可写区（data/ out/ models/）
+  Windows 为 MSIX 进程注入 PACKAGE_* 环境变量，以此识别。商店发行
+  只上 lite（模型首启下载到可写区），所以 models_dir() 在 MSIX 下
+  指可写区即可，全部 loader 调用点零改动；find_model() 留作将来
+  full 版上架时的双路径查找。
 """
 from __future__ import annotations
 
@@ -32,6 +41,11 @@ def is_frozen() -> bool:
     return bool(getattr(sys, "frozen", False))
 
 
+def is_msix() -> bool:
+    """运行在 MSIX/商店包里（Windows 会给包内进程注入这些变量）。"""
+    return bool(os.environ.get("PACKAGE_FAMILY_NAME"))
+
+
 def _exe_dir() -> str:
     """打包后：exe 所在目录。源码运行：项目根目录。"""
     if is_frozen():
@@ -41,10 +55,18 @@ def _exe_dir() -> str:
 
 
 def home() -> str:
-    """运行时根目录（放 models/ ui/ data/ out/ 的地方）。"""
+    """可写运行时根目录（放 models/ data/ out/ 的地方）。
+
+    MSIX 下 exe 目录只读，可写区切到 %LOCALAPPDATA%（卸载会被系统
+    清掉，符合商店惯例）；RETOUCHLAB_HOME 仍最高优先级，方便包内调试。
+    """
     env = os.environ.get("RETOUCHLAB_HOME", "").strip()
     if env:
         return os.path.abspath(env)
+    if is_msix():
+        return os.path.join(os.environ.get("LOCALAPPDATA",
+                                           os.path.expanduser("~")),
+                            "ZhaJinWenQianCake")
     return _exe_dir()
 
 
@@ -52,7 +74,28 @@ def models_dir() -> str:
     return os.path.join(home(), "models")
 
 
+def install_models_dir() -> str:
+    """安装目录里内置的模型（full 包 MSIX 化时用，只读）。"""
+    return os.path.join(_exe_dir(), "models")
+
+
+def find_model(name: str) -> str:
+    """模型查找：可写区优先（用户下载/替换优先），退回安装目录内置。
+
+    命中哪个返回哪个；两边都没有时返回可写区路径——调用方按
+    "文件不存在"走既有的不可用分支。
+    """
+    for d in (models_dir(), install_models_dir()):
+        p = os.path.join(d, name)
+        if os.path.isfile(p):
+            return p
+    return os.path.join(models_dir(), name)
+
+
 def ui_dir() -> str:
+    if is_msix():
+        # 前端资源是随包只读资产，永远在安装目录（exe 旁）
+        return os.path.join(_exe_dir(), "ui")
     return os.path.join(home(), "ui")
 
 

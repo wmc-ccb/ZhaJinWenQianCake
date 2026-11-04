@@ -17,6 +17,24 @@
 > skin, blemish, liquify, background, super-resolution, batch and RAW,
 > offline-first: photos never leave your machine.
 
+## 界面预览
+
+**主界面**：导入照片即出预设实时预览（每张缩略图是这套参数在你的照片上的真实效果，点一下即套用）
+
+![主界面](docs/screenshots/hero.png)
+
+**前后对比**（胶片预设一键，11 项参数联动）：
+
+| 原图 | 胶片 |
+|---|---|
+| ![原图](docs/screenshots/before.png) | ![胶片](docs/screenshots/after_film.png) |
+
+**人像精修深度**：二级菜单（美肤/五官/美型/身形/表情/妆容/头发）+ 分组滑杆
+
+![人像美肤](docs/screenshots/portrait_panel.png)
+
+> 示例照片来自 picsum.photos（免费图库许可）。
+
 ## 快速开始
 
 **方式 A · 普通用户**：到 [Releases](https://github.com/wmc-ccb/ZhaJinWenQianCake/releases) 下载发行包，解压后**双击 `ZhaJinWenQianCake.exe`** 即可，无需安装任何东西。两个版本任选：
@@ -1212,11 +1230,12 @@ Lanczos4 在整数偏移处是精确恒等，所以：
 
 ## 许可与用途
 
+**源代码**：[AGPL-3.0](LICENSE) + 商业双轨——开源使用遵循 AGPL-3.0
+（含网络服务同源开放义务）；闭源/OEM 商业集成请通过 Issues 联系
+作者购买商业授权。
+
 全部代码原创，使用公开算法与公开模型：引导滤波（ECCV 2010）、频率分离、
 YuNet（Apache-2.0）、insightface 关键点/解析模型（**研究/非商业**）、
 MediaPipe（Apache-2.0）、MODNet、LaMa（Apache-2.0）、
 RealESRGAN（BSD-3）、LibRaw（LGPL-2.1）、DIV2K。
-逐项许可与边界见 [THIRD_PARTY.md](THIRD_PARTY.md)。
-
-仅用于学习、研究和互操作性目的。分析他人软件前请确认你拥有该软件并获授权，
-并遵守其许可协议。
+**模型文件许可独立于代码**，逐项边界见 [THIRD_PARTY.md](THIRD_PARTY.md)。

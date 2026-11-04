@@ -1003,16 +1003,22 @@ def version():
 
     update_url 指向 GitHub Releases 的 latest 接口；仓库未公开时该地址
     返回 404，前端把它当「检查不可用」静默处理，绝不能弹错打扰用户。
+    MSIX/商店版：更新归商店管，update_url 置空禁自更新（商店审核
+    明确不允许应用内自更新机制），前端据此显示「商店版」。
     """
+    from engine.paths import is_msix
+    store = is_msix()
     return {
         "name": "炸金文谦蛋糕",
         "version": APP_VERSION,
         "build": APP_BUILD,
         "frozen": bool(getattr(sys, "frozen", False)),
         "python": sys.version.split()[0],
+        "store": store,
         # 公开仓库后更新检查才会真正生效；换分发渠道时改这里。
-        "update_url": ("https://api.github.com/repos/wmc-ccb/ZhaJinWenQianCake"
-                       "/releases/latest"),
+        "update_url": ("" if store else
+                       "https://api.github.com/repos/wmc-ccb/"
+                       "ZhaJinWenQianCake/releases/latest"),
     }
 
 
