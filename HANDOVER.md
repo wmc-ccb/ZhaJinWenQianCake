@@ -865,3 +865,26 @@ skin_gate/eyes/formula/hands_beach 全绿；超清 overlay/批量预解码/
   已入库并推送（200/200 blob）。
 - 其余全绿：打包版活性 4 端点、hands_beach 19/19、UI 特征全在
   （隧道/引导小窗/二级菜单/120 控件）、AI 服务 SKIPPED 符合预期。
+
+### Codex for OSS 申请冲刺（2026-11-04，用户改方向：商店后面再说）
+
+- 目标：提高 OpenAI「Codex for OSS」申请通过率。三个审核指标 =
+  采用度 / 生态重要性 / 活跃维护证据 + 隐式门槛"这算开源吗"。
+- **许可 OSI 化**：自定义"源码可用"→ **AGPL-3.0 + 商业双轨**
+  （LICENSE 重排过：AGPL 原文在前让 GitHub licensee 识别，双轨说明
+  移尾部附录；此前 NOASSERTION）。模型许可独立于代码，insightface
+  非商用边界在 THIRD_PARTY.md 如实标注。
+- **真实 UI 截图 4 张**（docs/screenshots/）：hero / before / after_film
+  / portrait_panel。方法：浏览器驱动 8765 打包版 + 页内 window.upload()
+  喂图 + .pcard[data-p] 预设卡片点击（注意：参数明细行是纯展示不可点；
+  子菜单项文本带图标前缀，exact 匹配会空）。示例照 picsum id/64 免费许可。
+- **仓库门面**：Topics×9、Discussions 开、CHANGELOG/ROADMAP、
+  SECURITY/CONTRIBUTING/issue+PR 模板（前一轮已推）。
+- **后台 6 分钟**：gh 批量 POST blobs 在 ~50 个稳定撞墙（exit 0 空
+  stdout），0.9s 节流不够，1.6s(≈38/min) 通过——pacing 包装见
+  git-environment 记忆。
+- **Store 专项未弃**：paths.py MSIX 感知 + make_msix.py 已入库
+  （0b1f525），3.02GB MSIX 可打包；卡在 signtool 对自签证书的
+  "No certificates found"（证书 EKU/私钥正常，待查环境）。上架时捡起。
+- 待用户：发宣传帖（草稿 out/promote-drafts.md）、注册
+  platform.openai.com 拿 org ID、攒 2-4 周数字后申。
