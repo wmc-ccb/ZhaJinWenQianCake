@@ -888,3 +888,27 @@ skin_gate/eyes/formula/hands_beach 全绿；超清 overlay/批量预解码/
   "No certificates found"（证书 EKU/私钥正常，待查环境）。上架时捡起。
 - 待用户：发宣传帖（草稿 out/promote-drafts.md）、注册
   platform.openai.com 拿 org ID、攒 2-4 周数字后申。
+
+### 像素蛋糕对标补强 + 十轮暴力测试（2026-11-05，用户点名两重点）
+
+- 对照：实机走查像素蛋糕 GUI（10 组 rail + 人像/衣物面板）+ 官方指南
+  祛路人/AI 布景两篇。差距补强三项：
+  1) **祛路人两段式**：新增 /api/passersby_detect（只检测返回归一化框）
+     → 前端红框覆盖层（点框=保留该人）→ /api/remove_passersby 加
+     exclude 参数（交占比>35% 判定同一人）+ SDXL 填充开关。
+  2) **换背景自定义图片**：/api/bgreplace 加 bg_png（cover-fit 铺满 +
+     保留原背景明暗融合，融合在 cover-fit **之后**——首版顺序反了被
+     冒烟抓到）。
+  3) **批量 AI 动作**：/api/batch 加 actions 参数（passersby/rigfix，
+     失败不炸整批），批处理面板勾选。
+- **十轮暴力测试**（tests/stress_loop.py，STRESS_ROUNDS=10）：六阶段
+  + G 阶段专轰新端点（detect 坏输入/exclude 畸形全谱/bg_png 伪造）。
+  压测 runner 修三轮：目标必须指向新代码（openapi 探针，状态码探测
+  会把业务 404 误判成路由 404）、SX.B 必须覆盖（否则 A-F 打旧包）、
+  探活超时 15→60（模型加载期误判致命）。
+- **压测抓到的真 bug（3 个）**：find_passersby 无脸图 return 形状
+  不一致；bgreplace 融合顺序；**upscale 任务 LRU 用 dict.popitem
+  (last=False)——Python3.13 直接 500，LRU>4 分支此前零测试覆盖**
+  （改 OrderedDict，6 连发验证 6/6）。
+- 终局：SURVIVED CLEAN — 10 轮全部存活、零 5xx、新端点零 bug、
+  内存峰值 2400MB 回落 1100MB 无泄漏。修复已推送（49bceb7）。
