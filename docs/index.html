@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>炸金文谦蛋糕 · 本地人像修图软件</title>
+<meta name="description" content="自主研发的全离线 AI 人像修图台：磨皮祛痘、液化塑形、消除路人、换天抠图、超清放大、批量出片、RAW 直修。照片全程不出本机。">
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #16181d; color: #e8e6e1;
+         font: 16px/1.75 "Microsoft YaHei", "PingFang SC", sans-serif; }
+  a { color: #d8a94e; text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 64px; }
+  h1 { font-size: 40px; letter-spacing: 2px; }
+  h1 small { display: block; font-size: 16px; font-weight: normal;
+             color: #9a978f; margin-top: 8px; letter-spacing: 0; }
+  .badges { margin: 18px 0 30px; }
+  .badges img { margin-right: 8px; vertical-align: middle; }
+  .hero { width: 100%; border-radius: 10px; border: 1px solid #2a2d35;
+          box-shadow: 0 12px 40px rgba(0,0,0,.45); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(240px,1fr));
+          gap: 14px; margin: 34px 0; }
+  .card { background: #1d2027; border: 1px solid #2a2d35; border-radius: 10px;
+          padding: 16px 18px; }
+  .card b { color: #d8a94e; display: block; margin-bottom: 4px; }
+  .card span { color: #b9b6ae; font-size: 14px; }
+  h2 { font-size: 22px; margin: 38px 0 14px; color: #f0eee9; }
+  .cta { display: inline-block; background: #d8a94e; color: #16181d;
+         font-weight: bold; padding: 12px 26px; border-radius: 8px;
+         margin: 6px 14px 6px 0; }
+  .cta:hover { text-decoration: none; filter: brightness(1.08); }
+  .fine { color: #8a877f; font-size: 13px; margin-top: 30px; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .pair img { width: 100%; border-radius: 8px; border: 1px solid #2a2d35; }
+  @media (max-width: 720px) { .pair { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>炸金文谦蛋糕<small>自主研发的全离线 AI 人像修图台 · Windows</small></h1>
+  <div class="badges">
+    <img alt="CI" src="https://github.com/wmc-ccb/ZhaJinWenQianCake/actions/workflows/ci.yml/badge.svg">
+    <img alt="License AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
+  </div>
+
+  <img class="hero" alt="主界面" src="screenshots/hero.png">
+
+  <div class="grid">
+    <div class="card"><b>人像精修</b><span>磨皮 / 祛痘 / 液化 / 面部塑形 / 牙齿眼睛，120 个参数控件</span></div>
+    <div class="card"><b>一键预设</b><span>每张缩略图是你照片的真实渲染效果，点一下即套用</span></div>
+    <div class="card"><b>消除 · 换天 · 抠图</b><span>祛路人杂物、换天空、四季背景、证件照联排</span></div>
+    <div class="card"><b>超清 4x · 批量 · RAW</b><span>RealESRGAN 放大、批量水印命名、NEF/CR2/CR3/ARW 直修</span></div>
+  </div>
+
+  <h2>前后对比（胶片预设，一键 11 项参数联动）</h2>
+  <div class="pair">
+    <img alt="原图" src="screenshots/before.png">
+    <img alt="胶片" src="screenshots/after_film.png">
+  </div>
+
+  <h2>照片不出本机</h2>
+  <p>所有照片只在本地内存中处理，模型全部本机推理；无上传功能、无遥测、
+  无账号。详见<a href="https://github.com/wmc-ccb/ZhaJinWenQianCake/blob/main/PRIVACY.md">隐私说明</a>与
+  <a href="https://github.com/wmc-ccb/ZhaJinWenQianCake/blob/main/SECURITY.md">安全政策</a>。</p>
+
+  <h2>获取</h2>
+  <p>
+    <a class="cta" href="https://github.com/wmc-ccb/ZhaJinWenQianCake/releases">下载 Release（解压双击即用）</a>
+    <a class="cta" href="https://github.com/wmc-ccb/ZhaJinWenQianCake" style="background:#2a2d35;color:#e8e6e1">GitHub 仓库</a>
+  </p>
+  <p>lite 版 ~5GB（首次启动后台下载模型 980MB，之后完全离线）；
+  full 版 ~6GB（内置全部模型）。Win10/11 x64。</p>
+
+  <p class="fine">源代码 AGPL-3.0 + 商业双轨 · 模型许可独立（见
+  THIRD_PARTY.md） · 示例照片来自 picsum.photos 免费图库 ·
+  <a href="https://github.com/wmc-ccb/ZhaJinWenQianCake#readme">中文 README</a> /
+  <a href="https://github.com/wmc-ccb/ZhaJinWenQianCake/blob/main/README_EN.md">English</a></p>
+</div>
+</body>
+</html>
