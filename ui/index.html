@@ -35,7 +35,7 @@
   #topbar { height: var(--topH); display: flex; align-items: center; gap: 6px;
     padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
   #topbar .title { font-weight: 700; letter-spacing: .3px; margin-right: 10px;
-    font-size: 14px; }
+    font-size: 14px; white-space: nowrap; flex-shrink: 0; }
   #topbar .title span { color: var(--gold); }
   .tgroup { display: flex; gap: 2px; align-items: center; padding: 0 10px;
     height: 30px; position: relative; }
@@ -637,23 +637,23 @@
       <button class="tbtn" id="btnUndo" disabled><span class="ico">↶</span>撤销</button>
       <button class="tbtn" id="btnRedo" disabled><span class="ico">↷</span>重做</button>
       <button class="tbtn" id="btnReset"><span class="ico">↺</span>重置</button>
-      <button class="tbtn" id="btnToggleBox"><span class="ico">🖻</span>人脸框</button>
+      <button class="tbtn" id="btnToggleBox" title="在预览上显示/隐藏人脸检测框（默认关）"><span class="ico">🖄</span>人脸框</button>
     </div>
     <div class="tgroup">
-      <button class="tbtn" id="btnAuto" disabled><span class="ico">✨</span>自动</button>
-      <button class="tbtn" id="btnHeal" disabled><span class="ico">◍</span>修复</button>
-      <button class="tbtn" id="btnStamp" disabled><span class="ico">⊞</span>图章</button>
-      <button class="tbtn" id="btnErase" disabled><span class="ico">✦</span>消除</button>
+      <button class="tbtn" id="btnAuto" disabled title="一键自动初修：曝光/色彩/磨皮一次到位"><span class="ico">✨</span>自动</button>
+      <button class="tbtn" id="btnHeal" disabled title="污点修复：点一下斑点/痘痘自动愈合"><span class="ico">◍</span>修复</button>
+      <button class="tbtn" id="btnStamp" disabled title="仿制图章：按住 Alt 取源，涂抹复制区域"><span class="ico">⊞</span>图章</button>
+      <button class="tbtn" id="btnErase" disabled title="智能消除：涂掉杂物/路人，AI 自动填充背景"><span class="ico">✦</span>消除</button>
       <button class="tbtn" id="btnPick" disabled title="点一下物体自动圈选，配合消除使用"><span class="ico">◎</span>点选</button>
-      <button class="tbtn" id="btnUpscale" disabled><span class="ico">⤢</span>超清</button>
+      <button class="tbtn" id="btnUpscale" disabled title="超清放大 4x（后台任务，可取消）"><span class="ico">⤢</span>超清</button>
     </div>
     <div class="tgroup">
-      <button class="tbtn" id="btnPicker" disabled><span class="ico">⬚</span>灰点</button>
-      <button class="tbtn" id="btnMatte" disabled><span class="ico">◑</span>抠图</button>
+      <button class="tbtn" id="btnPicker" disabled title="灰点校正：点画面里的中性灰，自动校白平衡"><span class="ico">⬚</span>灰点</button>
+      <button class="tbtn" id="btnMatte" disabled title="抠图换背景：AI 分离人像，可换底色/虚化"><span class="ico">◑</span>抠图</button>
     </div>
     <div class="tgroup">
-      <button class="tbtn" id="btnMatch" disabled><span class="ico">⇄</span>追色</button>
-      <button class="tbtn" id="btnCull"><span class="ico">★</span>挑图</button>
+      <button class="tbtn" id="btnMatch" disabled title="追色：把另一张照片的色调套到当前照片"><span class="ico">⇄</span>追色</button>
+      <button class="tbtn" id="btnCull" title="挑图选片：AI 评分排序，快速筛片"><span class="ico">★</span>挑图</button>
     </div>
     <!-- 缩放：预览/编辑/导出必须看同一个几何，所以缩放只影响显示 -->
     <div class="tgroup zoomg">
@@ -785,7 +785,7 @@
 // ============================================================
 const S = {
   session: null, faces: [], meta: null, params: {}, spec: [], groups: [],
-  showBox: true, base: null, img: null, rendering: false, pending: false,
+  showBox: false, base: null, img: null, rendering: false, pending: false,
 };
 
 // 网络自适应：公网访问时降预览画质/尺寸，局域网或本机保持全画质。
@@ -2069,7 +2069,36 @@ function renderSliders(group) {
   const wrap = $('sliders'); wrap.innerHTML = '';
   const items = S.spec.filter(s => s.group === group);
   if (!items.length) {
-    wrap.innerHTML = '<div style="color:var(--dim);font-size:12px;padding:20px 0">该分类暂无控件</div>';
+    // 空态不再是一句死胡同文案：按分类给去向或说明（走查抓到的
+    // 「生成式/宠物 空态死胡同」问题，与像素蛋糕的空态行为对齐）。
+    if (group === '生成式') {
+      wrap.innerHTML =
+        '<div class="groupTitle">生成式 AI（可选组件）</div>' +
+        '<div style="color:var(--dim);font-size:12px;line-height:1.8;padding:8px 0">' +
+        '生成式功能需要本机安装 ComfyUI 组件（约 13GB，可选）。未安装时' +
+        '其余全部功能正常；下面的工具面板里带一键安装与启动。</div>' +
+        '<div class="presetRow">' +
+        ['AI 布景', '创成式填充', '道具修复'].map(k =>
+          '<button class="chip" data-gen="' + k + '">' + k + '</button>').join('') +
+        '</div>';
+      wrap.querySelectorAll('[data-gen]').forEach(b => {
+        b.onclick = () => selectCat(b.dataset.gen);
+      });
+      return;
+    }
+    if (group === '宠物') {
+      wrap.innerHTML =
+        '<div class="groupTitle">宠物</div>' +
+        '<div style="color:var(--dim);font-size:12px;line-height:1.8;padding:8px 0">' +
+        '宠物专用分割模型暂未内置（如实说明，不伪造功能）。宠物照片可以：<br>' +
+        '· 用「人像」分类的基础滑杆与「消除」处理背景杂物<br>' +
+        '· 宠物面部被检测到时，「宠物修整」面板自动出现对应工具<br>' +
+        '· 模型支持在 ROADMAP 中列为待办，欢迎反馈需求优先级。</div>';
+      return;
+    }
+    wrap.innerHTML = '<div style="color:var(--dim);font-size:12px;line-height:1.8;padding:20px 0">' +
+      '该分类在当前照片/模式下暂无可调参数。<br>' +
+      '试试左侧其他分类，或先导入照片。</div>';
     return;
   }
   const buckets = [];
@@ -2201,11 +2230,13 @@ function renderPresetsPanel() {
     '预设是起点：应用后仍可用其它分类逐项微调，参数不会丢。';
   wrap.appendChild(tip);
 
-  // 预设参数明细：让"套用了什么"可见，而不是只有一张缩略图
+  // 预设参数明细：让"套用了什么"可见，而且**点行即套用**——之前是纯
+  // 展示却长得像按钮，走查时连着误导两次（对齐像素蛋糕预设列表行为）。
   const cur = Object.keys(PRESETS);
   const detail = document.createElement('div');
-  detail.innerHTML = '<div class="groupTitle">参数明细</div>' +
-    cur.map(k => '<div class="batchRow" style="font-size:11px">' +
+  detail.innerHTML = '<div class="groupTitle">参数明细（点击一行即套用）</div>' +
+    cur.map(k => '<div class="batchRow presetLink" data-p="' + k + '" ' +
+      'style="font-size:11px;cursor:pointer" title="点击套用这套参数">' +
       '<span style="width:64px;color:var(--gold)">' +
       ({ none: '原图', natural: '自然', studio: '影楼', beauty: '美颜',
          id_photo: '证件照', film: '胶片', mono: '黑白' }[k] || k) +
@@ -2216,6 +2247,14 @@ function renderPresetsPanel() {
           (Object.keys(PRESETS[k]).length > 6 ? ' …' : '')
         : '无调整') + '</span></div>').join('');
   wrap.appendChild(detail);
+  detail.querySelectorAll('.presetLink').forEach(el => {
+    el.onclick = async () => {
+      if (!S.session) { log('先载入图片'); return; }
+      await applyPresetByName(el.dataset.p);
+    };
+    el.onmouseenter = () => { el.style.background = 'rgba(216,169,78,.08)'; };
+    el.onmouseleave = () => { el.style.background = ''; };
+  });
 }
 
 // ============================================================
@@ -5121,7 +5160,7 @@ function renderLibrary() {
     '<option value="0">星级：全部</option>' +
     [1, 2, 3, 4, 5].map(n =>
       '<option value="' + n + '"' +
-      (LIB.starFilter === n ? ' selected' : '') + '>★'.repeat(n) + ' 及以上</option>'
+      (LIB.starFilter === n ? ' selected' : '') + '>' + '★'.repeat(n) + ' 及以上</option>'
     ).join('') + '</select>';
   wrap.appendChild(starBar);
   starBar.querySelector('select').onchange = e => {
@@ -6062,6 +6101,12 @@ async function upload(file) {
     addThumb(S.base, file.name);
     await refreshHistory();
     updateHistButtons();
+    // 预设缩略图是"这张照片"的真实渲染：载图后必须重跑一次，否则
+    // 启动期在无图状态渲染的预设栏会残缺/空（走查抓到的竞态）。
+    const _pc = document.getElementById('presetCol');
+    if (_pc && _pc.style.display !== 'none' && typeof renderPresetCol === 'function') {
+      renderPresetCol();
+    }
     $('meta').textContent = j.width + '×' + j.height
       + (j.decode && j.decode.raw ? ' · RAW' : '')
       + (j.faces.length ? ' · ' + j.faces.length + ' 张脸' : '');
