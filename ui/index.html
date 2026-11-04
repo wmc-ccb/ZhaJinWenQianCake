@@ -1729,12 +1729,14 @@ function bindZoom() {
 // 做视觉分隔（标题不可点），兼顾"找得到"和"点得快"。
 // `CAT_TREE` 由 /api/cats 提供（父子关系仍保留，只是不再做折叠）。
 let CAT_TREE = null;
-// 宽屏右侧栏用双列：36 项单列要滚约 1.8 屏（实测内容 1622px vs 可见
-// 903px），两列后能压进一屏，而且仍然是一次点击直达。
+// rail 固定单列（与参考软件一致）。双列是旧版「36 项平铺」时代的产物：
+// 二级菜单重构后一级只有 14 项，单列约 600px 一屏放得下；宽屏强制双列
+// 反而把分组拆成两条，用户明确不要（2026-11-05 反馈）。超矮窗口由
+// overflow-y:auto 兜底滚动。
 function railColumns() {
   const rail = $('rail');
   if (!rail) return;
-  rail.classList.toggle('cols2', window.innerWidth >= 1400);
+  rail.classList.remove('cols2');
 }
 const CAT_ICONS = {
   AI色彩: '✦', 调色: '◐', 局部: '◎', 人像: '☺', 图像: '▦', 衣物: '⬒',
