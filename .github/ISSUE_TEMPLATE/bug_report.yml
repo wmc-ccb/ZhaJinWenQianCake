@@ -1,0 +1,44 @@
+name: Bug 报告
+description: 功能异常 / 崩溃 / 结果不对
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先更新到最新 Release 再试；若问题依旧，填写以下信息。
+        安全漏洞请勿在此公开，见 SECURITY.md。
+  - type: textarea
+    id: what
+    attributes:
+      label: 发生了什么
+      description: 预期行为 vs 实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 打开照片（什么类型的照片）
+        2. 用了哪个工具 / 参数
+        3. 出现了什么
+    validations:
+      required: true
+  - type: textarea
+    id: diag
+    attributes:
+      label: 诊断信息
+      description: 「关于面板 → 复制诊断报告」的内容，以及 out\error.log 相关堆栈
+    validations:
+      required: true
+  - type: dropdown
+    id: form
+    attributes:
+      label: 运行形态
+      options:
+        - Release full（解压即用）
+        - Release lite（首启下载模型）
+        - 源码运行
+        - 其他
+    validations:
+      required: true

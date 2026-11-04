@@ -1,0 +1,23 @@
+name: 功能建议
+description: 希望增加或改进的功能
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scene
+    attributes:
+      label: 使用场景
+      description: 什么类型的照片、修图的哪一步、现在怎么做的
+    validations:
+      required: true
+  - type: textarea
+    id: expect
+    attributes:
+      label: 期望效果
+      description: 有参考软件/教程的话请附上
+  - type: checkboxes
+    id: will
+    attributes:
+      label: 意向
+      options:
+        - label: 我愿意参与测试这个功能
+        - label: 我愿意提交 PR 实现（先读 CONTRIBUTING.md）

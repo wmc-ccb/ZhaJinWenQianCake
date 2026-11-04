@@ -9,6 +9,13 @@
 - 全离线运行，照片不出本机
 - Python (FastAPI) 引擎 + ONNX 推理 + WebView2 桌面窗口
 - 调光调色 / 人像精修 / 抠图换背景 / 消除 / 批量 / RAW / 联机拍摄
+- 11 套无头回归套件 + CI；[安全政策](SECURITY.md) ·
+  [参与贡献](CONTRIBUTING.md) · [第三方许可清单](THIRD_PARTY.md) ·
+  [隐私说明](PRIVACY.md)
+
+> A self-developed, fully local AI portrait retouching studio for Windows —
+> skin, blemish, liquify, background, super-resolution, batch and RAW,
+> offline-first: photos never leave your machine.
 
 ## 快速开始
 
@@ -1206,8 +1213,10 @@ Lanczos4 在整数偏移处是精确恒等，所以：
 ## 许可与用途
 
 全部代码原创，使用公开算法与公开模型：引导滤波（ECCV 2010）、频率分离、
-YuNet（Apache-2.0）、2d106det/buffalo_l（模型文件与公开预处理约定）、
-MediaPipe pose（Apache-2.0）、MODNet、CLIP、LibRaw（LGPL-2.1）、DIV2K。
+YuNet（Apache-2.0）、insightface 关键点/解析模型（**研究/非商业**）、
+MediaPipe（Apache-2.0）、MODNet、LaMa（Apache-2.0）、
+RealESRGAN（BSD-3）、LibRaw（LGPL-2.1）、DIV2K。
+逐项许可与边界见 [THIRD_PARTY.md](THIRD_PARTY.md)。
 
 仅用于学习、研究和互操作性目的。分析他人软件前请确认你拥有该软件并获授权，
 并遵守其许可协议。
