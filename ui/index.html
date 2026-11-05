@@ -8564,7 +8564,36 @@ const ABOUT = {
   },
 
   checkUpdate(ver) {
-    if (!ver || !ver.update_url) return;
+    if (!ver) return;
+    if (ver.store) { ABOUT.update = { latest: null, store: true }; return; }
+    // 优先应用端点 /api/update/check：它同时服务"提示"与"一键更新"，
+    // 两处数据源必须一致（此前提示走 GitHub 直查、按钮走应用端点，
+    // 直查说没新版时按钮消失——用户看到提示点进来却没有一键更新）。
+    // 端点不可达（源码态无网/旧后端）才回落 GitHub 直查。
+    fetch('/api/update/check')
+      .then(r => r.ok ? r.json() : null)
+      .then(j => {
+        if (j && j.supported && j.available && j.latest) {
+          ABOUT.update = { latest: j.latest,
+                           url: 'https://github.com/wmc-ccb/ZhaJinWenQianCake/releases/tag/'
+                                + encodeURIComponent(j.latest),
+                           pick: j.pick || null };
+          const el = $('btnAbout');
+          if (el) el.title = '有新版本 ' + j.latest + ' · 点开查看';
+        } else if (j && j.supported) {
+          ABOUT.update = { latest: null };
+        } else {
+          ABOUT.githubFallback = true;
+          ABOUT.githubCheck(ver);
+        }
+      })
+      .catch(() => { ABOUT.githubFallback = true; ABOUT.githubCheck(ver); });
+  },
+
+  // 旧路径：直查 GitHub Releases latest（现在只作 /api/update/check
+  // 不可达时的降级）
+  githubCheck(ver) {
+    if (!ver.update_url) { ABOUT.update = { latest: null }; return; }
     const ctl = new AbortController();
     const timer = setTimeout(() => ctl.abort(), 4000);
     fetch(ver.update_url, { signal: ctl.signal })
