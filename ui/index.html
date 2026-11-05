@@ -692,6 +692,9 @@
       <button class="tbtn" id="btnMatch" disabled title="追色：把另一张照片的色调套到当前照片"><span class="ico">⇄</span>追色</button>
       <button class="tbtn" id="btnCull" title="挑图选片：AI 评分排序，快速筛片"><span class="ico">★</span>挑图</button>
     </div>
+    <div class="tgroup">
+      <button class="tbtn" id="btnBeforeHold" disabled title="按住查看原图，松开恢复（快捷键 \\）"><span class="ico">◨</span>对比</button>
+    </div>
     <!-- 缩放：预览/编辑/导出必须看同一个几何，所以缩放只影响显示 -->
     <div class="tgroup zoomg">
       <button class="tbtn" id="btnZoomOut" title="缩小">−</button>
@@ -2358,6 +2361,27 @@ function renderPresetsPanel() {
     '预设是起点：应用后仍可用其它分类逐项微调，参数不会丢。';
   wrap.appendChild(tip);
 
+  // 预设强度（对齐像素蛋糕）：套用时参数从默认值向预设值插值。
+  // 作用于之后每一次套用；改强度 + 已有激活预设 = 立即按新强度重套。
+  const st = document.createElement('div');
+  st.className = 'batchRow';
+  st.innerHTML = '<span style="width:52px;color:var(--dim)">强度</span>' +
+    '<input type="range" id="presetStrength" min="20" max="100" step="5" ' +
+    'value="' + Math.round((window.PRESET_STRENGTH || 1) * 100) + '" ' +
+    'style="flex:1"><span id="presetStrength_v" style="width:40px;' +
+    'color:var(--gold);text-align:right">' +
+    Math.round((window.PRESET_STRENGTH || 1) * 100) + '%</span>';
+  wrap.appendChild(st);
+  const stInp = st.querySelector('#presetStrength');
+  stInp.oninput = () => {
+    window.PRESET_STRENGTH = parseInt(stInp.value, 10) / 100;
+    $('presetStrength_v').textContent = stInp.value + '%';
+  };
+  stInp.onchange = () => {
+    const active = document.querySelector('.pcard.active');
+    if (active) applyPresetByName(active.dataset.p, window.PRESET_STRENGTH);
+  };
+
   // 预设参数明细：让"套用了什么"可见，而且**点行即套用**——之前是纯
   // 展示却长得像按钮，走查时连着误导两次（对齐像素蛋糕预设列表行为）。
   const cur = Object.keys(PRESETS);
@@ -2378,7 +2402,7 @@ function renderPresetsPanel() {
   detail.querySelectorAll('.presetLink').forEach(el => {
     el.onclick = async () => {
       if (!S.session) { log('先载入图片'); return; }
-      await applyPresetByName(el.dataset.p);
+      await applyPresetByName(el.dataset.p, window.PRESET_STRENGTH || 1);
     };
     el.onmouseenter = () => { el.style.background = 'rgba(216,169,78,.08)'; };
     el.onmouseleave = () => { el.style.background = ''; };
@@ -3001,7 +3025,7 @@ async function adoptTether(entry) {
     matteImg = null; eraseCanvas = null;
     $('dropzone').style.display = 'none';
     ['btnExport','btnErase','btnPick','btnPicker','btnMatte','btnMatch',
-     'btnAuto','btnHeal','btnStamp','btnUpscale'].forEach(id => {
+     'btnAuto','btnHeal','btnStamp','btnUpscale','btnBeforeHold'].forEach(id => {
        const el = $(id); if (el) el.disabled = false;
      });
     await drawBase();
@@ -5663,7 +5687,7 @@ async function libOpen(idx) {
     matteImg = null; eraseCanvas = null;
     $('dropzone').style.display = 'none';
     ['btnExport','btnErase','btnPick','btnPicker','btnMatte','btnMatch','btnAuto',
-     'btnHeal','btnStamp','btnUpscale'].forEach(id => {
+     'btnHeal','btnStamp','btnUpscale','btnBeforeHold'].forEach(id => {
        const e = $(id); if (e) e.disabled = false;
      });
     ZOOM.mode = 'fit';
@@ -6631,7 +6655,7 @@ async function upload(file) {
     await drawBase();
     $('dropzone').style.display = 'none';
     ['btnExport','btnErase','btnPick','btnPicker','btnMatte','btnMatch',
-     'btnAuto','btnHeal','btnStamp','btnUpscale'].forEach(
+     'btnAuto','btnHeal','btnStamp','btnUpscale','btnBeforeHold'].forEach(
       function (id) { $(id).disabled = false; });
     addThumb(S.base, file.name);
     await refreshHistory();
@@ -6786,10 +6810,19 @@ async function saveFull() {
   if (!S.session) return;
   // 导出目的地：优先原生保存对话框（File System Access API，桌面软件
   // 的标准体验）；不支持的环境（旧浏览器/file://）退回路径输入框。
-  // 注意句柄把手：本地文件路径服务端无法直接读回句柄内容，所以这里
-  // 仍走 /api/save 的服务端路径——对话框只用来**选择位置**，把选到的
-  // 目录回填成完整路径。
+  // 默认目录问服务端（/api/save/defaults）——它随安装位置走；此前
+  // 前端写死了开发机的绝对路径，在别人电脑上提示的目录不存在。
+  // 上次导出目录优先（localStorage），高频工作流是"连着往一个地方存"。
   let path = null;
+  let lastDir = null;
+  try { lastDir = localStorage.getItem('rl_export_dir'); } catch (e) {}
+  let defDir = lastDir || '';
+  if (!defDir) {
+    try {
+      defDir = (await fetch('/api/save/defaults')
+        .then(r => r.json())).dir || '';
+    } catch (e) { defDir = ''; }
+  }
   if (window.showSaveFilePicker) {
     try {
       const base = (S.srcPath ? S.srcPath.split(/[\\/]/).pop()
@@ -6799,11 +6832,11 @@ async function saveFull() {
         suggestedName: base + '_retouched' + ext,
         types: [{ description: 'JPEG 图像',
                   accept: { 'image/jpeg': ['.jpg'] } }] });
-      // 句柄拿不到真实路径（浏览器安全模型）；用名字 + 已知根目录拼。
-      // 用户数据目录里选的位置才是真实意图——这里退化为"输出根目录 +
-      // 文件名"，并提示用户可在资源管理器里移动。真正的全路径要靠
-      // 传统输入框路径，两种方式并存。
-      path = 'C:\\Users\\Rana\\ZhaJinWenQianCake\\out\\' + handle.name;
+      // 句柄拿不到真实路径（浏览器安全模型）；落到服务端默认导出目录，
+      // 并提示用户可在资源管理器里移动。上次目录已知则优先用它。
+      path = (lastDir || defDir).replace(/\\?$/, '\\') + handle.name;
+      try { localStorage.setItem('rl_export_dir', lastDir || defDir); }
+      catch (e2) {}
     } catch (e) {
       if (e && e.name === 'AbortError') return;   // 用户取消
       path = null;                                 // API 不可用 → 降级
@@ -6811,8 +6844,12 @@ async function saveFull() {
   }
   if (!path) {
     path = prompt('保存到（完整路径）：',
-      'C:\\\\Users\\\\Rana\\\\ZhaJinWenQianCake\\\\out\\\\retouched.jpg');
+      (lastDir || defDir).replace(/\\?$/, '\\') + 'retouched.jpg');
     if (!path) return;
+    try {
+      localStorage.setItem('rl_export_dir',
+                           path.substring(0, path.lastIndexOf('\\')));
+    } catch (e2) {}
   }
   setBusy(true);
   try {
@@ -6918,7 +6955,7 @@ async function renderPresetCol() {
         : '') +
       '</div>').join('');
     list.querySelectorAll('.pcard').forEach(card => {
-      card.onclick = () => applyPresetByName(card.dataset.p);
+      card.onclick = () => applyPresetByName(card.dataset.p, window.PRESET_STRENGTH || 1);
     });
     list.querySelectorAll('.pdel').forEach(btn => {
       btn.onclick = async (ev) => {
@@ -7026,7 +7063,7 @@ async function loadPresetThumbs(sid, keys) {
   }
 }
 
-async function applyPresetByName(name) {
+async function applyPresetByName(name, strength) {
   if (!S.session) { log('先载入图片'); return; }
   await loadPresetParams();
   const payload = presetPayload(name);
@@ -7034,13 +7071,31 @@ async function applyPresetByName(name) {
     // 原图：重新渲染空参数，等于把所有滑块归零
     log('预设：原图');
   }
+  // 预设强度（对齐像素蛋糕）：k∈(0,1) 时每个数值参数从默认值向预设
+  // 值插值——50% 强度 = 参数走一半。布尔/字符串不缩放。
+  const k = (strength == null) ? 1.0 : Math.min(1, Math.max(0.05, strength));
+  let scaled = payload;
+  if (k < 1.0) {
+    scaled = {};
+    const specOf = {};
+    (S.spec || []).forEach(sp => { specOf[sp.key] = sp; });
+    Object.keys(payload).forEach(key => {
+      const v = payload[key];
+      const sp = specOf[key];
+      if (typeof v === 'number' && sp && typeof sp.default === 'number') {
+        scaled[key] = sp.default + (v - sp.default) * k;
+      } else {
+        scaled[key] = v;
+      }
+    });
+  }
   setBusy(true);
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 20000);
     const r = await fetch('/api/render', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ session: S.session, params: payload,
+      body: JSON.stringify({ session: S.session, params: scaled,
                              quality: 92 }),
       signal: ctrl.signal,
     });
@@ -7055,9 +7110,10 @@ async function applyPresetByName(name) {
     const presetNames = { none: '原图', natural: '自然', studio: '影楼',
                           beauty: '美颜', film: '胶片', mono: '黑白',
                           id_photo: '证件照', vivid: '鲜艳' };
-    log('预设已应用：' + name + '（' + (j.applied || []).length + ' 项）');
-    toast('已套用「' + (presetNames[name] || name) + '」预设（' +
-      (j.applied || []).length + ' 项参数）');
+    log('预设已应用：' + name + (k < 1 ? '（强度 ' + Math.round(k * 100) + '%）' : '')
+        + '（' + (j.applied || []).length + ' 项）');
+    toast('已套用「' + (presetNames[name] || name) + '」预设' +
+      (k < 1 ? ' · 强度 ' + Math.round(k * 100) + '%' : ''));
   } catch (e) {
     log('预设失败：' + (e && e.name === 'AbortError'
                          ? '请求超时 20s' : (e && e.message) || e));
@@ -8337,10 +8393,19 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ---- 修图前后对比（\ 按住看原图，松开恢复）----
+// ---- 修图前后对比（\ 按住看原图，松开恢复；顶栏「对比」按钮同效）----
 document.addEventListener('keyup', e => {
   if (e.key === '\\') toggleBefore(false);
 });
+(() => {
+  const b = document.getElementById('btnBeforeHold');
+  if (!b) return;
+  b.addEventListener('mousedown', () => toggleBefore(true));
+  b.addEventListener('mouseup', () => toggleBefore(false));
+  b.addEventListener('mouseleave', () => toggleBefore(false));
+  b.addEventListener('touchstart', (e) => { e.preventDefault(); toggleBefore(true); });
+  b.addEventListener('touchend', () => toggleBefore(false));
+})();
 
 $('canvas').addEventListener('mousedown', ev => {
   if (BRUSH.mode) {
@@ -8634,8 +8699,20 @@ const ABOUT = {
           '<li><b>调整</b> — 右侧面板拖滑杆，右侧分类栏换工具组</li>' +
           '<li><b>人像</b> — 「人像」分类里磨皮 / 祛痘 / 液化 / 面部塑形</li>' +
           '<li><b>导出</b> — 右上角「导出」，批量处理在「图库」模块</li>' +
-          '<li><b>快捷键</b> — Ctrl+Z 撤销 · Ctrl+O 打开 · 空格对比原图</li>' +
         '</ol>' +
+        '<h3>快捷键</h3>' +
+        '<div class="kv">' +
+          '<span>撤销 / 重做</span><b>Ctrl+Z / Ctrl+Shift+Z</b>' +
+          '<span>打开 / 导出</span><b>Ctrl+O / Ctrl+E</b>' +
+          '<span>适应窗口 / 100%</span><b>Ctrl+0 / —</b>' +
+          '<span>对比原图（按住）</span><b>\\ 或顶栏「对比」</b>' +
+          '<span>工具切换</span><b>V 移动 · B 画笔 · S 图章 · E 祛边</b>' +
+          '<span>裁剪 / 蒙版</span><b>C / W</b>' +
+          '<span>自动初修</span><b>Ctrl+J</b>' +
+          '<span>星级（图库）</span><b>Shift+1..5</b>' +
+          '<span>滑杆双击</span><b>回到默认值</b>' +
+          '<span>滑杆数值</span><b>点击可精确输入</b>' +
+        '</div>' +
         '<h3>运行环境</h3>' +
         '<div class="kv">' +
           '<span>形态</span><b>' + (d.frozen ? '打包版' : '源码') +

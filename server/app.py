@@ -861,6 +861,20 @@ def _copy_exif(src: str, dst: str) -> dict:
     return note
 
 
+@app.get("/api/save/defaults")
+def save_defaults():
+    """导出默认值：输出根目录（随安装位置走，不硬编码机器路径）.
+
+    此前前端把开发机的绝对路径写死在导出提示里，在别人电脑上提示
+    的目录不存在——体验走查抓到的分发级 UX bug。
+    """
+    from engine.paths import home
+
+    out_dir = os.path.join(home(), "out", "export")
+    os.makedirs(out_dir, exist_ok=True)
+    return JSONResponse({"dir": out_dir})
+
+
 @app.post("/api/save")
 def save(req: SaveRequest):
     s = _get_session(req.session)
