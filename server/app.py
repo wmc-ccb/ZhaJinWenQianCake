@@ -1450,15 +1450,11 @@ class UpscaleRequest(BaseModel):
     job: bool = False              # true = 后台跑, 用 job id 轮询进度
 
 
-class BlendRequest(BaseModel):
-    """溶图：素材贴进照片 + 边缘/色彩融合.
+class BlendLayer(BaseModel):
+    """素材栈的单层（对齐像素蛋糕多图融合）。
 
-    asset_png：素材图 base64（PNG 带 alpha 最佳，JPG 也可以=矩形素材）。
-    cx/cy：素材中心的归一化位置。scale：素材长边/底图长边。
-    mode：alpha（纯羽化）/ poisson（泊松，色调自动适配）/ mixed（保
-    强边，文字/logo 用）。泊松失败自动回落 alpha，不会 500。
+    asset_png 必填；flip: none/h/v；opacity: 0~1 整体不透明度。
     """
-    session: str
     asset_png: str
     cx: float = 0.5
     cy: float = 0.5
@@ -1466,6 +1462,29 @@ class BlendRequest(BaseModel):
     angle: float = 0.0
     feather: float = 12.0
     mode: str = "poisson"
+    flip: str = "none"
+    opacity: float = 1.0
+
+
+class BlendRequest(BaseModel):
+    """溶图：素材贴进照片 + 边缘/色彩融合.
+
+    asset_png：单层快捷方式。`layers`：素材栈（按序叠加，后面的层
+    盖在前面之上），给了 layers 就忽略单层字段。
+    mode：alpha（纯羽化）/ poisson（泊松，色调自动适配）/ mixed（保
+    强边，文字/logo 用）。泊松失败自动回落 alpha，不会 500。
+    """
+    session: str
+    asset_png: Optional[str] = None
+    layers: Optional[List[BlendLayer]] = None
+    cx: float = 0.5
+    cy: float = 0.5
+    scale: float = 0.3
+    angle: float = 0.0
+    feather: float = 12.0
+    mode: str = "poisson"
+    flip: str = "none"
+    opacity: float = 1.0
     commit: bool = False
 
 
@@ -1476,25 +1495,48 @@ def do_blend(req: BlendRequest):
     from engine import blend as BL
 
     s = _get_session(req.session)
-    try:
-        raw = base64.b64decode(req.asset_png or "")
-        arr = np.frombuffer(raw, np.uint8)
-        if arr.size == 0:
-            raise HTTPException(400, "asset_png 为空")
-        asset = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(400, "asset_png 不是合法的 base64/图片")
-    if asset is None or asset.ndim != 3:
-        raise HTTPException(400, "素材解码失败")
-    asset = cv2.cvtColor(asset, cv2.COLOR_BGRA2RGBA) \
-        if asset.shape[2] == 4 else cv2.cvtColor(asset, cv2.COLOR_BGR2RGB)
+
+    def _decode(b64: str):
+        try:
+            raw = base64.b64decode(b64 or "")
+            arr = np.frombuffer(raw, np.uint8)
+            if arr.size == 0:
+                raise HTTPException(400, "asset_png 为空")
+            a = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(400, "asset_png 不是合法的 base64/图片")
+        if a is None or a.ndim != 3:
+            raise HTTPException(400, "素材解码失败")
+        return cv2.cvtColor(a, cv2.COLOR_BGRA2RGBA) \
+            if a.shape[2] == 4 else cv2.cvtColor(a, cv2.COLOR_BGR2RGB)
 
     try:
-        out, info = BL.blend(s["preview"], asset, cx=req.cx, cy=req.cy,
-                             scale=req.scale, angle=req.angle,
-                             feather=req.feather, mode=req.mode)
+        if req.layers:
+            # 素材栈：按序逐层融合（对齐像素蛋糕多图融合）
+            layers = []
+            for i, ly in enumerate(req.layers):
+                layers.append({
+                    "asset": _decode(ly.asset_png),
+                    "cx": ly.cx, "cy": ly.cy, "scale": ly.scale,
+                    "angle": ly.angle, "feather": ly.feather,
+                    "mode": ly.mode, "flip": ly.flip,
+                    "opacity": ly.opacity, "_i": i + 1})
+            for ly in layers:
+                if ly["flip"] not in ("none", "h", "v", "hv"):
+                    raise ValueError("flip 必须是 none/h/v/hv")
+                if ly["mode"] not in BL.MODES:
+                    raise ValueError("mode 必须是 %s 之一" % (BL.MODES,))
+            out, info = BL.blend_layers(s["preview"], layers)
+        else:
+            if not req.asset_png:
+                raise HTTPException(400, "asset_png 与 layers 至少给一个")
+            asset = _decode(req.asset_png)
+            out, info = BL.blend(s["preview"], asset, cx=req.cx, cy=req.cy,
+                                 scale=req.scale, angle=req.angle,
+                                 feather=req.feather, mode=req.mode,
+                                 flip=req.flip, opacity=req.opacity)
     except ValueError as e:
         raise HTTPException(400, str(e))
     if req.commit:

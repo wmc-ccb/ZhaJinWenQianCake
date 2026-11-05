@@ -47,11 +47,14 @@ def _rotated_bounds(w: int, h: int, angle: float) -> Tuple[int, int, np.ndarray]
 
 
 def prepare_asset(asset: np.ndarray, scale: float, angle: float,
-                  feather: float, base_long: int) -> Tuple[np.ndarray, np.ndarray]:
-    """素材 -> (rgb float32 0..1, alpha float32 0..1)，已旋转缩放.
+                  feather: float, base_long: int,
+                  flip: str = "none", opacity: float = 1.0
+                  ) -> Tuple[np.ndarray, np.ndarray]:
+    """素材 -> (rgb float32 0..1, alpha float32 0..1)，已翻转/缩放/旋转.
 
     alpha 来源：素材自带 alpha 通道；没有则全 1（矩形）。feather 对
-    alpha 做高斯羽化（单位 = 底图长边像素）。
+    alpha 做高斯羽化（单位 = 底图长边像素）。flip: none/h/v。
+    opacity：整体不透明度（乘进 alpha，0.6 = 六成实）。
     """
     a = np.asarray(asset, np.float32)
     if a.ndim != 3 or a.shape[2] not in (3, 4):
@@ -61,6 +64,11 @@ def prepare_asset(asset: np.ndarray, scale: float, angle: float,
     else:
         rgb, alpha = a, np.ones(a.shape[:2], np.float32)
     rgb = np.clip(rgb, 0, 1)
+
+    if flip in ("h", "hv", "vh"):
+        rgb, alpha = rgb[:, ::-1], alpha[:, ::-1]
+    if flip in ("v", "hv", "vh"):
+        rgb, alpha = rgb[::-1], alpha[::-1]
 
     h, w = rgb.shape[:2]
     target = max(8, int(round(base_long * float(np.clip(scale, 0.02, 4.0)))))
@@ -84,14 +92,15 @@ def prepare_asset(asset: np.ndarray, scale: float, angle: float,
         ksz = int(max(3, round(feather * 2)) | 1)
         alpha = cv2.GaussianBlur(alpha, (ksz, ksz),
                                  max(0.5, feather * 0.5))
-    alpha = np.clip(alpha, 0, 1)
+    alpha = np.clip(alpha, 0, 1) * float(np.clip(opacity, 0.0, 1.0))
     return rgb, alpha
 
 
 def blend(img: np.ndarray, asset: np.ndarray,
           cx: float = 0.5, cy: float = 0.5, scale: float = 0.3,
           angle: float = 0.0, feather: float = 12.0,
-          mode: str = "poisson") -> Tuple[np.ndarray, dict]:
+          mode: str = "poisson", flip: str = "none",
+          opacity: float = 1.0) -> Tuple[np.ndarray, dict]:
     """把素材融进底图，返回 (结果图, info)."""
     if mode not in MODES:
         raise ValueError("mode 必须是 %s 之一" % (MODES,))
@@ -99,7 +108,8 @@ def blend(img: np.ndarray, asset: np.ndarray,
     if base.ndim != 3:
         raise ValueError("底图必须是 3 通道")
     bh, bw = base.shape[:2]
-    rgb, alpha = prepare_asset(asset, scale, angle, feather, max(bh, bw))
+    rgb, alpha = prepare_asset(asset, scale, angle, feather, max(bh, bw),
+                               flip=flip, opacity=opacity)
 
     ah, aw = rgb.shape[:2]
     # 中心点落在画布外太多就没意义，夹回 0..1
@@ -156,3 +166,30 @@ def blend(img: np.ndarray, asset: np.ndarray,
     base[y0:y1, x0:x1] = out
     info["engine"] = used
     return np.clip(base, 0, 1), info
+
+
+def blend_layers(img: np.ndarray,
+                 layers: List[dict]) -> Tuple[np.ndarray, dict]:
+    """素材栈：按列表顺序逐层融合（后面的层盖在前面之上）.
+
+    `layers` 每项是 blend() 的参数 dict（cx/cy/scale/angle/feather/
+    mode/flip/opacity），asset 项直接传 ndarray。任一层非法（缺 asset、
+    mode 错）抛 ValueError 由端点转 4xx；单层泊松失败沿用 blend 内部
+    的回落逻辑，不炸整栈。info["layers"] 逐层记录实际引擎。
+    """
+    base = np.asarray(img, np.float32)
+    infos = []
+    for i, ly in enumerate(layers):
+        asset = ly.get("asset")
+        if asset is None:
+            raise ValueError("第 %d 层缺少素材" % (i + 1))
+        base, bi = blend(base, asset,
+                         cx=ly.get("cx", 0.5), cy=ly.get("cy", 0.5),
+                         scale=ly.get("scale", 0.3),
+                         angle=ly.get("angle", 0.0),
+                         feather=ly.get("feather", 12.0),
+                         mode=ly.get("mode", "poisson"),
+                         flip=ly.get("flip", "none"),
+                         opacity=ly.get("opacity", 1.0))
+        infos.append(bi)
+    return base, {"layers": infos, "count": len(infos)}
