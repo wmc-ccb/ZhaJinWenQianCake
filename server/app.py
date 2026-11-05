@@ -1450,6 +1450,189 @@ class UpscaleRequest(BaseModel):
     job: bool = False              # true = 后台跑, 用 job id 轮询进度
 
 
+# ============================================================
+# 一键更新（对齐商店外的自更新路径；MSIX/商店版由 /api/update/* 拒绝）
+# ============================================================
+_UPDATE_JOBS: dict = {}                    # job_id -> 状态 dict
+_UPDATE_JOBS_LOCK = threading.Lock()
+
+
+@app.get("/api/update/check")
+def update_check():
+    """查 GitHub 最新 Release，与当前版本比较，挑出可下载的分卷组.
+
+    商店版(MSIX)返回 supported=false——更新归商店管，审核不允许
+    应用内自更新机制（is_msix 判定见 /api/version）。
+    """
+    from engine import updater as UP
+    from engine.paths import is_msix
+
+    if is_msix():
+        return JSONResponse({"supported": False,
+                             "reason": "store",
+                             "current": APP_VERSION})
+    try:
+        rel = UP.latest()
+    except Exception as e:
+        return JSONResponse({"supported": False, "reason": "network",
+                             "error": str(e)[:120],
+                             "current": APP_VERSION})
+    variant = "lite"
+    try:
+        models_sub = os.path.join(UP.app_dir(), "models")
+        has_models = os.path.isdir(models_sub) and os.listdir(models_sub)
+        variant = "full" if has_models else "lite"
+    except Exception:
+        pass
+    pick = UP.pick_assets(rel["assets"], variant)
+    total = sum(a["size"] for a in pick["volumes"]) if pick else 0
+    return JSONResponse({
+        "supported": True,
+        "current": APP_VERSION,
+        "latest": rel["tag"],
+        "available": UP.newer(rel["tag"], APP_VERSION),
+        "variant": variant,
+        "pick": {"volumes": [a["name"] for a in pick["volumes"]],
+                 "total_bytes": total,
+                 "sha_name": pick["sha_name"]} if pick else None,
+        "free_gb": UP.free_gb(UP.stage_dir()),
+    })
+
+
+class UpdateDownloadRequest(BaseModel):
+    variant: str = "lite"          # full | lite
+
+
+@app.post("/api/update/download")
+def update_download(req: UpdateDownloadRequest):
+    """后台下载指定变体的分卷组（断点续传 + SHA256），返回 job id."""
+    from engine import updater as UP
+    from engine.paths import is_msix
+
+    if is_msix():
+        raise HTTPException(403, "商店版不支持应用内更新")
+    if req.variant not in ("full", "lite"):
+        raise HTTPException(400, "variant 必须是 full 或 lite")
+    try:
+        rel = UP.latest()
+    except Exception as e:
+        raise HTTPException(502, "GitHub 查询失败: %s" % str(e)[:120])
+    pick = UP.pick_assets(rel["assets"], req.variant)
+    if not pick:
+        raise HTTPException(404, "Release 上没有 %s 变体的分卷组"
+                           % req.variant)
+    stage = UP.stage_dir()
+    free = UP.free_gb(stage)
+    total_gb = sum(a["size"] for a in pick["volumes"]) / 1024 ** 3
+    if 0 < free < total_gb * 1.15:
+        raise HTTPException(507, "磁盘空间不足：需要约 %.1fGB，剩余 %.1fGB"
+                            % (total_gb * 1.15, free))
+    # SHA 清单：更新器先下它（小文件）用于逐卷校验
+    sha_asset = next((a for a in rel["assets"]
+                      if a["name"] == pick["sha_name"]), None)
+    sha_map = {}
+    if sha_asset:
+        try:
+            with UP._open(sha_asset["url"]) as r:
+                sha_map = UP.parse_sha256(r.read().decode("utf-8", "replace"))
+        except Exception:
+            sha_map = {}               # 没有清单也能下（只校验大小）
+    job_id = uuid.uuid4().hex[:12]
+    state = {"phase": "downloading", "variant": req.variant,
+             "latest": rel["tag"], "pct": 0, "bytes_done": 0,
+             "bytes_total": sum(a["size"] for a in pick["volumes"]),
+             "vol": 0, "n_vols": len(pick["volumes"]), "error": "",
+             "cancel": False, "zip": ""}
+    with _UPDATE_JOBS_LOCK:
+        _UPDATE_JOBS[job_id] = state
+        while len(_UPDATE_JOBS) > 4:
+            _UPDATE_JOBS.pop(next(iter(_UPDATE_JOBS)))
+
+    def _work():
+        def _progress(done, total, vi, nv):
+            with _UPDATE_JOBS_LOCK:
+                st = _UPDATE_JOBS.get(job_id)
+                if st is None:
+                    return
+                st["bytes_done"] = done
+                st["bytes_total"] = total
+                st["vol"], st["n_vols"] = vi, nv
+                st["pct"] = int(done * 100 / max(total, 1))
+        try:
+            vols = UP.download_volumes(pick["volumes"], sha_map, stage,
+                                       progress=_progress,
+                                       cancel=lambda: state["cancel"])
+            with _UPDATE_JOBS_LOCK:
+                state["phase"] = "merging"
+            zpath = os.path.join(stage, "update-%s.zip"
+                                 % rel["tag"].lstrip("v"))
+            UP.merge(vols, zpath,
+                     progress=lambda d, t: _progress(d, t, state["vol"],
+                                                     state["n_vols"]))
+            with _UPDATE_JOBS_LOCK:
+                state["phase"] = "done"
+                state["zip"] = zpath
+                state["pct"] = 100
+        except UP.Cancelled:
+            with _UPDATE_JOBS_LOCK:
+                state["phase"] = "cancelled"
+        except Exception as exc:
+            with _UPDATE_JOBS_LOCK:
+                state["phase"] = "error"
+                state["error"] = str(exc)[:200]
+
+    threading.Thread(target=_work, daemon=True,
+                     name="update-" + job_id).start()
+    return JSONResponse({"job": job_id})
+
+
+@app.get("/api/update/job/{job_id}")
+def update_job(job_id: str):
+    with _UPDATE_JOBS_LOCK:
+        j = _UPDATE_JOBS.get(job_id)
+        if j is None:
+            raise HTTPException(404, "job 不存在")
+        return JSONResponse({k: v for k, v in j.items()
+                             if k not in ("cancel",)})
+
+
+@app.post("/api/update/job/{job_id}/cancel")
+def update_cancel(job_id: str):
+    with _UPDATE_JOBS_LOCK:
+        j = _UPDATE_JOBS.get(job_id)
+        if j is None:
+            raise HTTPException(404, "job 不存在")
+        j["cancel"] = True
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/update/apply")
+def update_apply(req: dict = Body(...)):
+    """用已下载完成的 job 生成更新器 bat 并拉起；应用将在 2 秒后退出，
+    更新器等它退出后解压覆盖并自动重启."""
+    from engine import updater as UP
+    from engine.paths import is_msix
+
+    if is_msix():
+        raise HTTPException(403, "商店版不支持应用内更新")
+    job_id = str(req.get("job") or "")
+    with _UPDATE_JOBS_LOCK:
+        j = _UPDATE_JOBS.get(job_id)
+    if j is None:
+        raise HTTPException(404, "job 不存在")
+    if j.get("phase") != "done" or not j.get("zip"):
+        raise HTTPException(400, "下载尚未完成（phase=%s）" % j.get("phase"))
+    bat = UP.write_bat(j["zip"])
+    UP.spawn_bat(bat)
+
+    def _die():
+        time.sleep(2.0)
+        os._exit(0)                    # 窗口应用：直接退出，更新器接管
+    threading.Timer(2.0, _die).start()
+    return JSONResponse({"ok": True,
+                         "message": "更新器已启动，应用即将退出并自动安装"})
+
+
 class BlendLayer(BaseModel):
     """素材栈的单层（对齐像素蛋糕多图融合）。
 

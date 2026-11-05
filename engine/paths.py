@@ -54,6 +54,16 @@ def _exe_dir() -> str:
     return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
+def app_dir() -> str:
+    """应用安装目录（打包版 = exe 所在目录；源码态 = 项目根）。
+
+    与 home() 的区别：home 是"可写运行时根"（MSIX 下切到
+    LOCALAPPDATA），app_dir 永远指向安装目录——一键更新器要用它
+    定位被替换的 exe 与解压目标。
+    """
+    return _exe_dir()
+
+
 def home() -> str:
     """可写运行时根目录（放 models/ data/ out/ 的地方）。
 
