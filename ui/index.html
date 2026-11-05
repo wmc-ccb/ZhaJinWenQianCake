@@ -199,6 +199,9 @@
     justify-content: center; }
   .pbBox.pbKeep { border-color: #7a828f; color: #c6c9cf;
     background: rgba(122, 130, 143, .18); }
+  /* 溶图素材框：虚线金框 + 素材缩略，可拖动 */
+  #blendBox { position: absolute; border: 1.5px dashed var(--gold);
+    border-radius: 4px; touch-action: none; z-index: 5; }
   #dropzone { position: absolute; inset: 20px; border: 2px dashed var(--line);
     border-radius: 12px; display: flex; flex-direction: column; align-items: center;
     justify-content: center; gap: 8px; color: var(--dim); cursor: pointer; }
@@ -1408,7 +1411,7 @@ const SPECIAL_ICONS = {
   '配置文件': '☰',
   '滤镜': '⚗', '后调色': '◔', '背景消除': '▤', '换天空': '☁',
   '补草地': '⌡', '去道具': '⊥', '四季背景': '❀', '证件照': '▣',
-  'AI 布景': '✨', '创成式填充': '༻', '道具修复': '⚕',
+  'AI 布景': '✨', '创成式填充': '༻', '道具修复': '⚕', '溶图': '⧉',
   '宠物修整': '❋',
   '表情管理': '☺', '妆容调整': '✿', '头发调整': '≋', '衣物': '⬒',
   '祛边': '⧗', '历史': '⏱', '联机': '⌾', '配方': '⑃', '批处理': '⧉',
@@ -2055,6 +2058,7 @@ function selectCat(key) {
   else if (key === '四季背景') renderScene();
   else if (key === 'AI 布景' || key === '创成式填充' || key === '道具修复')
     renderGen();
+  else if (key === '溶图') renderBlend();
   else if (key === '宠物修整') renderPet();
   else if (key === '证件照') renderIdPhoto();
   else if (key === '图库') renderLibrary();
@@ -5879,6 +5883,212 @@ async function applyBgReplace() {
     log(BGC.bgImg ? '背景已替换为自定义图片（明暗融合' +
         (keep ? '开' : '关') + '）' : '背景已替换');
   } catch (e) { log('换背景失败：' + e.message); }
+  finally { setBusy(false); }
+}
+
+// ============================================================
+// 溶图（素材融合）：上传素材 -> 画布拖放定位 -> 羽化/泊松融合
+// ============================================================
+const BLD = { asset: null, aw: 0, ah: 0, cx: 0.5, cy: 0.5, scale: 0.3,
+              angle: 0, feather: 12, mode: 'poisson', timer: null };
+
+function renderBlend() {
+  const wrap = $('sliders'); wrap.innerHTML = '';
+  const head = document.createElement('div');
+  head.className = 'groupTitle'; head.textContent = '溶图 · 素材融合';
+  wrap.appendChild(head);
+  const tip = document.createElement('div');
+  tip.style.cssText = 'color:var(--dim);font-size:11px;line-height:1.7;' +
+    'padding:6px 0';
+  tip.innerHTML = '上传素材（PNG 透明底最佳）→ 在预览上拖动定位 → ' +
+    '选融合方式 → 应用。泊松=色调自动适配底图；保留强边=文字/logo；' +
+    '纯羽化=素材原样。';
+  wrap.appendChild(tip);
+
+  const up = document.createElement('div');
+  up.className = 'batchRow';
+  up.innerHTML = '<button class="goldbtn" id="bldUp">① 上传素材…</button>' +
+    '<input type="file" id="bldFile" accept="image/png,image/jpeg,image/webp" ' +
+    'style="display:none">' +
+    '<span class="bstat" id="bldName" style="flex:1"></span>';
+  wrap.appendChild(up);
+
+  const pos = document.createElement('div');
+  pos.className = 'batchRow';
+  pos.innerHTML = '<button class="chip" id="bldReCenter" disabled>' +
+    '② 回到中心</button>' +
+    '<span class="bstat" style="flex:1">素材框在预览上直接拖动</span>';
+  wrap.appendChild(pos);
+
+  const mk = (id, label, min, max, step, val) => {
+    const d = document.createElement('div');
+    d.className = 'batchRow';
+    d.innerHTML = '<span style="width:56px;color:var(--dim)">' + label +
+      '</span><input type="range" id="' + id + '" min="' + min +
+      '" max="' + max + '" step="' + step + '" value="' + val +
+      '" style="flex:1"><span id="' + id + '_v" style="width:40px;' +
+      'color:var(--gold);text-align:right">' + val + '</span>';
+    wrap.appendChild(d);
+    return d;
+  };
+  mk('bldScale', '大小', 5, 150, 1, Math.round(BLD.scale * 100));
+  mk('bldAngle', '旋转', -180, 180, 1, BLD.angle);
+  mk('bldFeather', '羽化', 0, 60, 1, BLD.feather);
+
+  const modeRow = document.createElement('div');
+  modeRow.className = 'batchRow';
+  modeRow.innerHTML = '<span style="width:56px;color:var(--dim)">融合</span>' +
+    '<select id="bldMode" style="flex:1">' +
+    '<option value="poisson">泊松 · 色调自动适配（推荐）</option>' +
+    '<option value="mixed">泊松 · 保留素材强边（文字/logo）</option>' +
+    '<option value="alpha">纯羽化 · 素材原样</option></select>';
+  wrap.appendChild(modeRow);
+
+  const acts = document.createElement('div');
+  acts.className = 'presetRow';
+  acts.innerHTML = '<button class="goldbtn" id="bldApply" disabled>③ 应用溶图</button>' +
+    '<button class="chip" id="bldClear">移除素材</button>';
+  wrap.appendChild(acts);
+
+  const upd = (id, fn) => {
+    const e = $(id);
+    if (e) e.oninput = () => {
+      fn(parseFloat(e.value));
+      const v = $(id + '_v');
+      if (v) v.textContent = e.value;
+      scheduleBlendPreview();
+    };
+  };
+  upd('bldScale', v => { BLD.scale = v / 100; drawBlendBox(); });
+  upd('bldAngle', v => { BLD.angle = v; drawBlendBox(); });
+  upd('bldFeather', v => { BLD.feather = v; });
+  $('bldMode').onchange = () => {
+    BLD.mode = $('bldMode').value;
+    scheduleBlendPreview();
+  };
+
+  $('bldUp').onclick = () => $('bldFile').click();
+  $('bldFile').onchange = () => {
+    const f = $('bldFile').files && $('bldFile').files[0];
+    if (!f) return;
+    const rd = new FileReader();
+    rd.onload = () => {
+      const im = new Image();
+      im.onload = () => {
+        BLD.asset = String(rd.result).split(',')[1] || null;
+        BLD.aw = im.naturalWidth; BLD.ah = im.naturalHeight;
+        BLD.cx = 0.5; BLD.cy = 0.5;
+        $('bldName').textContent = f.name + '（' + im.naturalWidth +
+          '×' + im.naturalHeight + '）';
+        $('bldApply').disabled = !S.session;
+        $('bldReCenter').disabled = false;
+        drawBlendBox();
+        scheduleBlendPreview();
+      };
+      im.src = rd.result;
+    };
+    rd.readAsDataURL(f);
+    $('bldFile').value = '';
+  };
+  $('bldReCenter').onclick = () => {
+    BLD.cx = 0.5; BLD.cy = 0.5;
+    drawBlendBox(); scheduleBlendPreview();
+  };
+  $('bldApply').onclick = () => applyBlend(true);
+  $('bldClear').onclick = () => {
+    BLD.asset = null; BLD.cx = 0.5; BLD.cy = 0.5;
+    $('bldName').textContent = '';
+    $('bldApply').disabled = true;
+    $('bldReCenter').disabled = true;
+    removeBlendBox();
+    if (S.session) { S.base = S.lastPre || S.base; drawBase(); }
+  };
+  drawBlendBox();
+}
+
+function drawBlendBox() {
+  removeBlendBox();
+  const ov = document.getElementById('overlay');
+  if (!ov || !BLD.asset) return;
+  const d = document.createElement('div');
+  d.id = 'blendBox';
+  d.style.left = (BLD.cx * 100) + '%';
+  d.style.top = (BLD.cy * 100) + '%';
+  // 框的显示尺寸 = 素材长边(相对底图长边) × 画布长边；按画布宽高比摊开
+  const c = $('canvas');
+  if (c) {
+    const longPx = Math.max(c.width, c.height) * BLD.scale;
+    const ratio = BLD.aw && BLD.ah ? BLD.aw / BLD.ah : 1;
+    const pxw = (BLD.aw >= BLD.ah ? longPx : longPx * ratio) / c.width * 100;
+    const pxh = (BLD.aw >= BLD.ah ? longPx / ratio : longPx) / c.height * 100;
+    d.style.width = pxw + '%';
+    d.style.height = pxh + '%';
+  }
+  d.style.transform = 'translate(-50%,-50%) rotate(' + BLD.angle + 'deg)';
+  d.title = '拖动定位';
+  d.style.cursor = 'move';
+  d.onpointerdown = (ev) => {
+    ev.preventDefault();
+    d.setPointerCapture(ev.pointerId);
+    const ovRect = ov.getBoundingClientRect();
+    const move = (e2) => {
+      BLD.cx = Math.min(1, Math.max(0, (e2.clientX - ovRect.left) / ovRect.width));
+      BLD.cy = Math.min(1, Math.max(0, (e2.clientY - ovRect.top) / ovRect.height));
+      d.style.left = (BLD.cx * 100) + '%';
+      d.style.top = (BLD.cy * 100) + '%';
+      scheduleBlendPreview();
+    };
+    const up2 = () => {
+      d.removeEventListener('pointermove', move);
+      d.removeEventListener('pointerup', up2);
+    };
+    d.addEventListener('pointermove', move);
+    d.addEventListener('pointerup', up2);
+  };
+  ov.appendChild(d);
+}
+
+function removeBlendBox() {
+  const e = document.getElementById('blendBox');
+  if (e) e.remove();
+}
+
+function scheduleBlendPreview() {
+  if (!BLD.asset || !S.session) return;
+  clearTimeout(BLD.timer);
+  BLD.timer = setTimeout(() => applyBlend(false), 320);
+}
+
+async function applyBlend(commit) {
+  if (!BLD.asset) { log('先上传素材'); return; }
+  if (!S.session) { log('先载入图片'); return; }
+  setBusy(true);
+  try {
+    const r = await fetch('/api/blend', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session: S.session, asset_png: BLD.asset,
+                             cx: BLD.cx, cy: BLD.cy, scale: BLD.scale,
+                             angle: BLD.angle, feather: BLD.feather,
+                             mode: BLD.mode, commit: commit }) });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.detail || r.statusText);
+    if (commit) {
+      S.base = 'data:image/jpeg;base64,' + j.image;
+      S.lastPre = S.base;
+      await drawBase(); await refreshHistory();
+      removeBlendBox();
+      log('溶图已应用（' + (j.info.engine || j.info.mode) + '）');
+    } else {
+      // 预览画在画布上但不进历史；记录预览以便"移除素材"回退
+      S.lastPre = S.base;
+      const im = new Image();
+      im.onload = () => {
+        const c = $('canvas');
+        if (c) c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      };
+      im.src = 'data:image/jpeg;base64,' + j.image;
+    }
+  } catch (e) { log('溶图失败：' + e.message); }
   finally { setBusy(false); }
 }
 

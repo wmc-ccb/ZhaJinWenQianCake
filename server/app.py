@@ -1450,6 +1450,60 @@ class UpscaleRequest(BaseModel):
     job: bool = False              # true = 后台跑, 用 job id 轮询进度
 
 
+class BlendRequest(BaseModel):
+    """溶图：素材贴进照片 + 边缘/色彩融合.
+
+    asset_png：素材图 base64（PNG 带 alpha 最佳，JPG 也可以=矩形素材）。
+    cx/cy：素材中心的归一化位置。scale：素材长边/底图长边。
+    mode：alpha（纯羽化）/ poisson（泊松，色调自动适配）/ mixed（保
+    强边，文字/logo 用）。泊松失败自动回落 alpha，不会 500。
+    """
+    session: str
+    asset_png: str
+    cx: float = 0.5
+    cy: float = 0.5
+    scale: float = 0.3
+    angle: float = 0.0
+    feather: float = 12.0
+    mode: str = "poisson"
+    commit: bool = False
+
+
+@app.post("/api/blend")
+def do_blend(req: BlendRequest):
+    import cv2
+
+    from engine import blend as BL
+
+    s = _get_session(req.session)
+    try:
+        raw = base64.b64decode(req.asset_png or "")
+        arr = np.frombuffer(raw, np.uint8)
+        if arr.size == 0:
+            raise HTTPException(400, "asset_png 为空")
+        asset = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(400, "asset_png 不是合法的 base64/图片")
+    if asset is None or asset.ndim != 3:
+        raise HTTPException(400, "素材解码失败")
+    asset = cv2.cvtColor(asset, cv2.COLOR_BGRA2RGBA) \
+        if asset.shape[2] == 4 else cv2.cvtColor(asset, cv2.COLOR_BGR2RGB)
+
+    try:
+        out, info = BL.blend(s["preview"], asset, cx=req.cx, cy=req.cy,
+                             scale=req.scale, angle=req.angle,
+                             feather=req.feather, mode=req.mode)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    if req.commit:
+        _commit(s, out, "溶图")
+    return JSONResponse({
+        "image": base64.b64encode(encode_jpeg(out, 92)).decode("ascii"),
+        "info": info, "committed": bool(req.commit)})
+
+
 # 超清任务表：100-150 秒的重活必须有进度，否则用户以为死机。
 _UPSCALE_JOBS: "OrderedDict[str, dict]" = OrderedDict()
 # OrderedDict 而非 dict：LRU 裁剪用 popitem(last=False)（最旧任务先出，
