@@ -1723,9 +1723,16 @@ function setMode(mode) {
   buildCats();
   // 图库模块进来就自动开始加载照片库（首次扫描在后台，界面不卡）
   if (mode === 'library') libLoadSources();
-  // 当前分类不在新模块里就落到第一个
+  // 当前分类不在新模块里就落到第一个；retouch 模式优先回到上次
+  // 用过的分类（localStorage），没有记录才落第一个
   const allowed = MODES[mode].cats;
-  const first = allowed ? allowed[0] : '预设';
+  let first = allowed ? allowed[0] : '预设';
+  if (mode === 'retouch') {
+    try {
+      const last = localStorage.getItem('rl_last_cat');
+      if (last && (!allowed || allowed.indexOf(last) >= 0)) first = last;
+    } catch (e) {}
+  }
   selectCat(first);
   log('已切换到「' + MODES[mode].label + '」模块');
 }
@@ -2054,6 +2061,13 @@ document.addEventListener('pointerdown', ev => {
 
 function selectCat(key) {
   syncRailGroup(key);
+  // 记住上次分类：下次载图/启动回到你上次的地方。只记**叶子分类**
+  // （大组名如"调色"自身无面板，恢复它只会落到空态——实测踩过）。
+  try {
+    if (!CAT_TREE || !CAT_TREE[key]) {
+      localStorage.setItem('rl_last_cat', key);
+    }
+  } catch (e) {}
   // 进入 AI 相关分类而模型未齐且用户没拒绝过 → 重新唤起下载小窗
   if (key === '生成式' || key === 'AI色彩') {
     try {
@@ -8432,6 +8446,13 @@ bindLeftTools();
 bindHistCol();
 bindPresetTabs();
   renderPresetsPanel();
+  // 恢复上次分类：reload/重启后直接回到你上次用的地方（rl_last_cat
+  // 在 selectCat 里记录）。放在 renderPresetsPanel 之后——否则默认
+  // 预设面板会把恢复的面板盖掉（实测踩过）。'预设'不必恢复。
+  try {
+    const lastCat = localStorage.getItem('rl_last_cat');
+    if (lastCat && lastCat !== '预设') selectCat(lastCat);
+  } catch (e) {}
   log('参数表载入：' + S.spec.length + ' 个控件，'
     + Object.keys(PRESETS).length + ' 个预设，'
     + S.groups.length + ' 个分类');
