@@ -38,9 +38,10 @@ from typing import Optional
 
 from .paths import app_dir, home
 
-LATEST_URL = ("https://api.github.com/repos/wmc-ccb/ZhaJinWenQianCake"
-              "/releases/latest")
-_ALLOWED_HOSTS = {"github.com", "objects.githubusercontent.com",
+RELEASES_URL = ("https://api.github.com/repos/wmc-ccb/ZhaJinWenQianCake"
+                "/releases?per_page=20")
+_ALLOWED_HOSTS = {"api.github.com", "github.com",
+                  "objects.githubusercontent.com",
                   "release-assets.githubusercontent.com"}
 UA = "ZhaJinWenQianCake-Updater"
 STAGE_SUB = os.path.join("out", "update")
@@ -133,18 +134,34 @@ def _open(url: str, headers: dict = None, allow_local: bool = False):
 
 
 # ---------------------------------------------------------------- 查新
-def latest(api_base: str = LATEST_URL) -> dict:
-    """查最新 Release：tag/资产清单。api_base 仅测试注入（限本机 http）。"""
-    with _open(api_base, {"Accept": "application/vnd.github+json"},
-               allow_local=(api_base != LATEST_URL)) as r:
+def latest(list_base: str = RELEASES_URL) -> dict:
+    """查最新的**版本号** Release：tag/资产清单.
+
+    拉 releases 列表（而非 /releases/latest）——列表里混着 models-v1
+    这类模型分发 Release，它不带版本号语义，latest 端点按创建时间取
+    会把它当"最新版"返回（实测）。这里取第一个 tag 匹配 vX.Y.Z 语义
+    的条目；全都不匹配才回落第一个。
+    list_base 仅测试注入（限本机 http）。
+    """
+    with _open(list_base, {"Accept": "application/vnd.github+json"},
+               allow_local=(list_base != RELEASES_URL)) as r:
         j = json.loads(r.read().decode("utf-8"))
+    items = j if isinstance(j, list) else [j]
+    chosen = None
+    for it in items:
+        tag = str(it.get("tag_name", "")).lstrip().lower()
+        if re.match(r"^v?\d+\.\d+(\.\d+)?", tag):
+            chosen = it
+            break
+    if chosen is None and items:
+        chosen = items[0]
     assets = [{"name": _safe_name(a.get("name", "")),
                "size": int(a.get("size", 0)),
                "url": a.get("browser_download_url", "")}
-              for a in j.get("assets", [])]
-    return {"tag": str(j.get("tag_name", "")),
-            "name": str(j.get("name", "")),
-            "published": str(j.get("published_at", "")),
+              for a in chosen.get("assets", [])]
+    return {"tag": str(chosen.get("tag_name", "")),
+            "name": str(chosen.get("name", "")),
+            "published": str(chosen.get("published_at", "")),
             "assets": assets}
 
 

@@ -111,7 +111,7 @@ def main():
     client = TestClient(app)
 
     fake_api = fake + "/api.json"
-    rel = UP.latest(api_base=fake_api)
+    rel = UP.latest(list_base=fake_api)
     check("latest 解析假 API", rel["tag"] == "v9.9.9" and len(rel["assets"]) == 3)
     check("newer 语义比较", UP.newer("9.9.9", APP_VERSION) and
           not UP.newer("1.0.0", "1.0.0") and UP.newer("v2.0.0", "1.9.9"))
@@ -119,6 +119,17 @@ def main():
     check("pick 分卷连号", pick and len(pick["volumes"]) == 2
           and pick["sha_name"] == "SHA256-lite.txt")
     check("pick 变体隔离", UP.pick_assets(rel["assets"], "full") is None)
+
+    # 真 GitHub 查新（离线则跳过）：LATEST_URL 必须在白名单内可达
+    try:
+        real = UP.latest()
+        check("真 GitHub 查新可达", bool(real["tag"]))
+    except Exception as e:
+        msg = str(e)
+        if "白名单" in msg or "DNS" in msg or "非公网" in msg:
+            check("真 GitHub 查新可达", False, msg[:80])
+        else:
+            print("  (离线，跳过真源查新:", msg[:60], ")")
 
     # 安全边界：测试注入只放行本机
     try:
