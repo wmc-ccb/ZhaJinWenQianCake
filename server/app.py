@@ -266,9 +266,14 @@ _RENDER_CACHE_MAX = 32
 # parameter metadata, driving the UI
 # --------------------------------------------------------------------------
 
-def _p(key, label, lo, hi, default, group, hint=""):
-    return {"key": key, "label": label, "min": lo, "max": hi,
-            "default": default, "group": group, "hint": hint}
+def _p(key, label, lo, hi, default, group, hint="", badge=""):
+    """参数条目。badge: ''/'New'/'Beta'——前端滑杆旁的金色小标
+    （对齐像素蛋糕的功能标注习惯，帮助用户注意到新能力）。"""
+    d = {"key": key, "label": label, "min": lo, "max": hi,
+         "default": default, "group": group, "hint": hint}
+    if badge:
+        d["badge"] = badge
+    return d
 
 
 PARAM_SPEC = [
@@ -344,8 +349,8 @@ PARAM_SPEC = [
     _p("nr_color", "减少杂色", 0, 100, 0, "细节"),
     _p("nr_detail", "降噪细节", 0, 100, 50, "细节"),
     _p("nr_smoothness", "平滑度", 0, 100, 50, "细节"),
-    _p("ai_denoise", "AI 降噪", 0, 100, 0, "细节"),
-    _p("ai_denoise_strength", "AI 强度", 0, 100, 50, "细节"),
+    _p("ai_denoise", "AI 降噪", 0, 100, 0, "细节", badge="New"),
+    _p("ai_denoise_strength", "AI 强度", 0, 100, 50, "细节", badge="New"),
     # ---- 镜头 optics ----------------------------------------------------
     _p("distortion", "畸变", -100, 100, 0, "镜头"),
     _p("vignetting", "暗角", -100, 100, 0, "镜头"),

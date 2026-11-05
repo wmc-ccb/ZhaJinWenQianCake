@@ -214,6 +214,26 @@
   #busy { position: absolute; top: 14px; left: 14px; background: rgba(0,0,0,.78);
     padding: 5px 12px; border-radius: 6px; font-size: 12px; display: none;
     border: 1px solid var(--line); }
+  /* 处理中转圈：busy 可见时 ::before 转起来（对齐像素蛋糕的处理指示） */
+  #busy::before { content: ''; display: inline-block; width: 10px; height: 10px;
+    margin-right: 7px; vertical-align: -1px; border-radius: 50%;
+    border: 2px solid var(--gold); border-top-color: transparent;
+    animation: bldspin .8s linear infinite; }
+  @keyframes bldspin { to { transform: rotate(360deg); } }
+  /* 轻提示 toast：右下角浮现，2.6s 自动消退，不打断操作 */
+  #toastBox { position: fixed; right: 18px; bottom: 96px; z-index: 260;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+  .toast { background: rgba(20,22,27,.94); border: 1px solid var(--gold);
+    color: var(--text); padding: 9px 16px; border-radius: 8px;
+    font-size: 12.5px; box-shadow: 0 6px 22px rgba(0,0,0,.4);
+    animation: toastIn .22s ease-out; max-width: 320px; }
+  @keyframes toastIn { from { opacity: 0; transform: translateY(8px); }
+                       to { opacity: 1; transform: none; } }
+  .toast.out { opacity: 0; transition: opacity .3s; }
+  /* 滑杆数值点击编辑框 */
+  .valEdit { width: 64px; background: var(--panel3); color: var(--text);
+    border: 1px solid var(--gold); border-radius: 4px; font-size: 12px;
+    padding: 1px 4px; text-align: right; }
 
   /* 旧的 #film 条已被 #filmbox（选图条）取代，CSS 保留会误导下一次改动 */
   #filmbox { display: none; background: var(--panel);
@@ -352,6 +372,11 @@
     visibility: hidden; margin-right: 6px; }
   .sl .hdr:hover .reset { visibility: visible; }
   .sl .reset:hover { color: var(--gold); }
+  /* 参数徽章（New/Beta）：金色小标，对齐像素蛋糕的功能标注习惯 */
+  .pbadge { display: inline-block; font-size: 8.5px; font-weight: 700;
+    color: #16120a; background: var(--gold); border-radius: 3px;
+    padding: 0 4px; margin-left: 4px; vertical-align: 1px;
+    letter-spacing: .5px; }
   input[type=range] { width: 100%; -webkit-appearance: none; appearance: none;
     height: 3px; border-radius: 2px; background: var(--panel3); outline: none; }
   input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
@@ -822,7 +847,32 @@ const log = (msg) => {
   el.prepend(d);
   while (el.children.length > 40) el.removeChild(el.lastChild);
 };
-const setBusy = (on) => { $('busy').style.display = on ? 'block' : 'none'; };
+// busy 计数器：并发路径（预览+缩略图+溶图预览）各自 setBusy(true/false)
+// 不能互相踩掉——计数归零才熄灯（旧版布尔值在高频操作下会提前熄）。
+let _busyN = 0;
+const setBusy = (on) => {
+  _busyN = Math.max(0, _busyN + (on ? 1 : -1));
+  const el = $('busy');
+  if (el) el.style.display = _busyN > 0 ? 'block' : 'none';
+};
+
+// 轻提示：不打断操作的右下角浮层（替代 alert 的低危场景）
+function toast(msg, ms) {
+  let box = document.getElementById('toastBox');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'toastBox';
+    document.body.appendChild(box);
+  }
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  box.appendChild(t);
+  setTimeout(() => {
+    t.classList.add('out');
+    setTimeout(() => t.remove(), 320);
+  }, ms || 2600);
+}
 
 // The status line is derived from state, not written ad hoc. It used to be set
 // only inside upload() and doRender(), so any path that made a session active
@@ -2196,11 +2246,14 @@ function sliderEl(s) {
   const step = hasUnit ? UNIT_SCALE[s.key].step
     : (isBool ? 1 : ((s.max - s.min) <= 10 ? 0.05 : 1));
   const dmin = dispVal(s.key, s.min), dmax = dispVal(s.key, s.max);
+  // 徽章（对齐像素蛋糕的 New/Beta 标）：spec 里带 badge 就亮出来
+  const badge = s.badge
+    ? ' <span class="pbadge">' + s.badge + '</span>' : '';
   d.innerHTML =
-    '<div class="hdr"><span class="name">' + s.label +
+    '<div class="hdr"><span class="name">' + s.label + badge +
     (s.hint ? ' <span title="' + s.hint + '" style="color:var(--dim)">ⓘ</span>' : '') +
     '</span><span><span class="reset" data-k="' + s.key + '">重置</span>' +
-    '<span class="val" id="v_' + s.key + '">' +
+    '<span class="val" id="v_' + s.key + '" title="点击输入精确值">' +
     (hasUnit ? dispFmt(s.key, dispVal(s.key, S.params[s.key]))
              : fmt(S.params[s.key], step)) +
     '</span></span></div>' +
@@ -2214,11 +2267,48 @@ function sliderEl(s) {
     updateVal(s.key, S.params[s.key]);
     requestRender();
   });
-  d.querySelector('.reset').onclick = () => {
+  // 双击归零（对齐像素蛋糕：双击滑杆回到默认）——与"重置"链接等价
+  inp.addEventListener('dblclick', () => {
     S.params[s.key] = s.default;
     inp.value = dispVal(s.key, s.default);
     updateVal(s.key, s.default);
     requestRender();
+    toast(s.label + ' 已重置');
+  });
+  const resetBtn = d.querySelector('.reset');
+  resetBtn.onclick = () => {
+    S.params[s.key] = s.default;
+    inp.value = dispVal(s.key, s.default);
+    updateVal(s.key, s.default);
+    requestRender();
+  };
+  // 数值点击编辑：精确输入（输入超界自动夹回）
+  const valEl = d.querySelector('.val');
+  valEl.onclick = () => {
+    if (valEl.querySelector('input')) return;
+    const cur = S.params[s.key];
+    const ed = document.createElement('input');
+    ed.type = 'number';
+    ed.className = 'valEdit';
+    ed.min = dmin; ed.max = dmax; ed.step = 'any';
+    ed.value = cur;
+    valEl.textContent = '';
+    valEl.appendChild(ed);
+    ed.focus(); ed.select();
+    const commit = () => {
+      let v = parseFloat(ed.value);
+      if (isNaN(v)) v = cur;
+      v = Math.min(Math.max(v, s.min), s.max);
+      S.params[s.key] = v;
+      inp.value = dispVal(s.key, v);
+      updateVal(s.key, v);
+      requestRender();
+    };
+    ed.onkeydown = (ev) => {
+      if (ev.key === 'Enter') ed.blur();
+      if (ev.key === 'Escape') { ed.value = cur; ed.blur(); }
+    };
+    ed.onblur = () => { commit(); };
   };
   return d;
 }
@@ -6948,7 +7038,12 @@ async function applyPresetByName(name) {
     await refreshHistory();
     document.querySelectorAll('.pcard').forEach(c =>
       c.classList.toggle('active', c.dataset.p === name));
+    const presetNames = { none: '原图', natural: '自然', studio: '影楼',
+                          beauty: '美颜', film: '胶片', mono: '黑白',
+                          id_photo: '证件照', vivid: '鲜艳' };
     log('预设已应用：' + name + '（' + (j.applied || []).length + ' 项）');
+    toast('已套用「' + (presetNames[name] || name) + '」预设（' +
+      (j.applied || []).length + ' 项参数）');
   } catch (e) {
     log('预设失败：' + (e && e.name === 'AbortError'
                          ? '请求超时 20s' : (e && e.message) || e));
