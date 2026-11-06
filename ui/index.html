@@ -23,6 +23,18 @@
     --topH: 52px; --railW: 64px; --sideW: 490px; --filmH: 96px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  /* 全局暗滚动条：亮色默认条在暗工作区里非常扎眼 */
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #3e3e41; border-radius: 4px;
+    border: 2px solid var(--panel); }
+  ::-webkit-scrollbar-thumb:hover { background: #4d4d50; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  /* 文字选中色：默认亮蓝跟暗主题打架，改中性提亮 */
+  ::selection { background: rgba(207, 161, 74, .32); color: #fff; }
+  /* 键盘导航焦点环：默认 outline 在暗底上不可见 */
+  :focus-visible { outline: 2px solid rgba(207, 161, 74, .55);
+    outline-offset: 1px; }
+  button:focus:not(:focus-visible) { outline: none; }
   html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
     font: 13px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei UI", sans-serif;
     overflow: hidden; }
@@ -8765,7 +8777,7 @@ const ABOUT = {
           '任何人拿到链接+口令都能访问，用完即关</span></div>';
       }
       card.innerHTML =
-        '<h2>ZhaJinWenQianCake</h2>' +
+        '<h2 style="color:var(--text)">ZhaJinWenQianCake</h2>' +
         '<div class="kv">' +
           '<span>版本</span><b>' + (v.version || '…') +
             (v.store ? ' · 商店版' : '') + '</b>' +
@@ -8877,7 +8889,7 @@ const UPD = {
       'display:flex;align-items:center;justify-content:center;z-index:300';
     ov.innerHTML =
       '<div style="background:var(--panel);border:1px solid var(--line);' +
-      'border-radius:12px;padding:22px 26px;width:520px;max-width:92vw">' +
+      'border-radius:6px;padding:22px 26px;width:520px;max-width:92vw">' +
       '<h3 style="margin:0 0 10px">一键更新</h3>' +
       '<div id="updBody" style="font-size:12px;line-height:1.8;' +
       'color:var(--dim)">正在查询最新版本…</div>' +
