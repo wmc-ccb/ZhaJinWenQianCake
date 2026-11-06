@@ -215,6 +215,12 @@
     padding: 5px 12px; border-radius: 6px; font-size: 12px; display: none;
     border: 1px solid var(--line); }
   /* 处理中转圈：busy 可见时 ::before 转起来（对齐像素蛋糕的处理指示） */
+  /* 图库悬停放大：格子微缩放 + 640px 大图浮层（对齐像素蛋糕） */
+  #libGrid .libCell img { transition: transform .18s ease; }
+  #libGrid .libCell:hover img { transform: scale(1.05); }
+  #libHover img { width: 100%; display: block; }
+  #libHover .cap { font-size: 11px; color: var(--dim); padding: 4px 8px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #busy::before { content: ''; display: inline-block; width: 10px; height: 10px;
     margin-right: 7px; vertical-align: -1px; border-radius: 50%;
     border: 2px solid var(--gold); border-top-color: transparent;
@@ -5157,6 +5163,7 @@ async function makeIdPhoto(save) {
 // ============================================================
 // 分组不是"按文件名"，而是按**技术指标**：抖动/欠曝/过曝/重复/精选。
 // 判据是这一批自身的分位数，所以夜景不会被整批标成欠曝。
+let libHoverTimer = null;
 const LIB = {
   roots: null, scanning: false, path: '', items: [], groups: {},
   filter: 'all', sel: {}, view: 'grid', pollTimer: null,
@@ -5429,6 +5436,42 @@ function renderLibrary() {
   wrap.appendChild(grid);
   grid.querySelectorAll('.libCell').forEach(el => {
     const idx = parseInt(el.dataset.i, 10);
+    // 悬停放大预览：400ms 停留拉 640px 大图浮层，移开即消失。
+    // thumb 接口失败时静默——悬停是辅助路径，不弹错误。
+    el.addEventListener('mouseenter', (ev) => {
+      const cell = ev.currentTarget;
+      const it = LIB.items[idx];          // idx 在闭包里，it 要从 LIB 取
+      if (!it) return;
+      clearTimeout(libHoverTimer);
+      libHoverTimer = setTimeout(() => {
+        let hov = document.getElementById('libHover');
+        if (hov) hov.remove();
+        hov = document.createElement('div');
+        hov.id = 'libHover';
+        const big = it.thumb ||
+          (it.path ? '/api/library/thumb?size=640&path=' +
+                     encodeURIComponent(it.path) : '');
+        hov.innerHTML = big ? '<img src="' + big + '">' : '';
+        const cap = document.createElement('div');
+        cap.className = 'cap';
+        cap.textContent = it.path ? it.path.split(/[\/]/).pop() : '未保存';
+        hov.appendChild(cap);
+        const r = cell.getBoundingClientRect();
+        const left = r.left > 420 ? r.left - 356 : r.right + 8;
+        hov.style.left = Math.max(8, left) + 'px';
+        hov.style.top = Math.min(window.innerHeight - 280,
+                                 Math.max(8, r.top)) + 'px';
+        hov.style.cssText += ';position:fixed;z-index:150;width:340px;' +
+          'background:var(--panel);border:1px solid var(--gold);' +
+          'border-radius:8px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.5)';
+        document.body.appendChild(hov);
+      }, 400);
+    });
+    el.addEventListener('mouseleave', () => {
+      clearTimeout(libHoverTimer);
+      const hov = document.getElementById('libHover');
+      if (hov) hov.remove();
+    });
     el.onclick = ev => {
       if (ev.shiftKey || ev.ctrlKey) {
         LIB.sel[idx] = !LIB.sel[idx];
