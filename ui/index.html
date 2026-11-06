@@ -10,14 +10,14 @@
      图标用 Unicode 字符而非图片，全部原创。
      ============================================================ */
   :root {
-    --bg: #0a0a0c;            /* 应用底色（近纯黑） */
-    --panel: #121215;          /* 面板 */
-    --panel2: #1a1b1f;         /* 面板内分区 */
-    --panel3: #222328;         /* 控件底 */
-    --line: #26272c;
-    --text: #e8e9ec; --dim: #8a8c93;
-    --gold: #e8b341;           /* 品牌金（强调/选中） */
-    --gold2: #c9962e;
+    --bg: #1e1e20;            /* 工作区灰（PS/LR 式中性，非纯黑） */
+    --panel: #252527;          /* 面板 */
+    --panel2: #2b2b2d;         /* 面板内分区 */
+    --panel3: #353537;         /* 控件底 */
+    --line: #3e3e41;
+    --text: #d6d6d8; --dim: #939396;
+    --gold: #cfa14a;           /* 强调色（收敛饱和；仅 CTA/选中竖条/数值修改态） */
+    --gold2: #b08a3a;
     --ok: #3fbf7f;
     --danger: #e05555;
     --topH: 52px; --railW: 64px; --sideW: 490px; --filmH: 96px;
@@ -36,7 +36,7 @@
     padding: 0 12px; background: var(--panel); border-bottom: 1px solid var(--line); }
   #topbar .title { font-weight: 700; letter-spacing: .3px; margin-right: 10px;
     font-size: 14px; white-space: nowrap; flex-shrink: 0; }
-  #topbar .title span { color: var(--gold); }
+  #topbar .title span { color: var(--dim); font-weight: 400; }
   .tgroup { display: flex; gap: 2px; align-items: center; padding: 0 10px;
     height: 30px; position: relative; }
   /* A visible divider between tool families. A 1px line on #121215 is nearly
@@ -50,7 +50,9 @@
     border-radius: 6px; padding: 6px 9px; cursor: pointer; font-size: 12px;
     display: flex; align-items: center; gap: 5px; white-space: nowrap; }
   .tbtn:hover { background: var(--panel3); }
-  .tbtn.active { background: rgba(232,179,65,.14); color: var(--gold); }
+  .tbtn.active { background: #3a3a3c; color: #fff; }
+  .tbtn.active::before { content: ''; width: 2px; height: 14px;
+    background: var(--gold); margin-right: 6px; border-radius: 1px; }
   .tbtn:disabled { opacity: .35; cursor: not-allowed; }
   .tbtn .ico { font-size: 14px; line-height: 1; }
   /* ---- 三模块切换 ---- */
@@ -60,17 +62,17 @@
     font-size: 11px; padding: 4px 12px; border-radius: 4px; cursor: pointer;
     white-space: nowrap; }
   .mode:hover { color: var(--text); }
-  .mode.active { background: var(--panel); color: var(--gold); }
+  .mode.active { background: var(--panel); color: var(--text); }
   .mode .new { font-size: 8px; color: #e8b341; vertical-align: super;
     margin-left: 1px; letter-spacing: .5px; }
   /* ---- 缩放 ---- */
   .zoomg { gap: 2px; }
   .zoomval { font-size: 10px; color: var(--dim); min-width: 32px;
     text-align: center; }
-  #btnExport { background: var(--gold); color: #141005; border: none;
-    font-weight: 700; padding: 7px 18px; border-radius: 6px; cursor: pointer;
+  #btnExport { background: var(--gold); color: #17130a; border: none;
+    font-weight: 700; padding: 7px 18px; border-radius: 3px; cursor: pointer;
     font-size: 13px; margin-left: auto; order: 9; }
-  #btnExport:hover { background: #f2c55c; }
+  #btnExport:hover { background: #ddb256; }
   #btnExport:disabled { opacity: .4; }
   /* meta sits before the export button so the primary action stays rightmost */
   #meta { color: var(--dim); font-size: 11px; text-align: right;
@@ -97,27 +99,29 @@
     padding: 2px 8px 8px; letter-spacing: 2px; }
   #railFly .flyBtn { display: flex; align-items: center; gap: 7px;
     width: 100%; padding: 7px 9px; background: transparent; border: none;
-    border-radius: 7px; color: var(--text); font-size: 12px; cursor: pointer;
+    border-radius: 4px; color: var(--text); font-size: 12px; cursor: pointer;
     text-align: left; }
   #railFly .flyBtn:hover { background: var(--panel3); }
-  #railFly .flyBtn.active { background: var(--panel3); color: var(--gold); }
-  .rgroup.active { background: var(--panel3); color: var(--gold); }
+  #railFly .flyBtn.active { background: #3a3a3c; color: #fff; }
+  #railFly .flyBtn.active::before { content: ''; width: 2px; align-self: stretch;
+    background: var(--gold); margin-right: 4px; border-radius: 1px; }
+  .rgroup.active { background: #3a3a3c; color: #fff; }
 
   /* ---- 启动主界面：未载图时的工作流入口（与参考软件一致） ---- */
   #homeScreen { position: fixed; inset: 0; background: var(--bg);
     z-index: 70; display: flex; align-items: center; justify-content: center; }
   #homeScreen .inner { text-align: center; max-width: 780px; padding: 20px; }
-  #homeScreen .logo { font-size: 40px; font-weight: 600; color: var(--gold);
-    cursor: default; }
-  #homeScreen .logo span { color: var(--text); }
+  #homeScreen .logo { font-size: 34px; font-weight: 600; color: var(--text);
+    letter-spacing: 1px; cursor: default; }
+  #homeScreen .logo span { color: var(--dim); font-weight: 400; }
   #homeScreen .sub { color: var(--dim); font-size: 13px; margin: 12px 0 30px; }
   #homeScreen .cards { display: grid; grid-template-columns: repeat(3, 1fr);
     gap: 12px; }
   #homeScreen .hcard { background: var(--panel); border: 1px solid var(--line);
-    border-radius: 12px; padding: 20px 12px 16px; cursor: pointer;
+    border-radius: 4px; padding: 20px 12px 16px; cursor: pointer;
     text-align: center; transition: border-color .15s; }
-  #homeScreen .hcard:hover { border-color: var(--gold); }
-  #homeScreen .hcard .i { font-size: 28px; display: block; margin-bottom: 10px; }
+  #homeScreen .hcard:hover { border-color: #6a6a6e; background: var(--panel2); }
+  #homeScreen .hcard .i { font-size: 26px; display: block; margin-bottom: 10px; color: var(--text); }
   #homeScreen .hcard b { font-size: 13px; color: var(--text); display: block;
     margin-bottom: 4px; }
   #homeScreen .hcard span { font-size: 11px; color: var(--dim); }
@@ -133,13 +137,14 @@
      reach on a 1000px window; scrolling is still available as a fallback but
      everything fits at the sizes people actually use. */
   .rbtn { width: 52px; padding: 4px 0 3px; background: transparent; border: none;
-    border-radius: 7px; color: var(--dim); cursor: pointer; text-align: center;
+    border-radius: 4px; color: var(--dim); cursor: pointer; text-align: center;
     display: flex; flex-direction: column; align-items: center; gap: 0;
     flex: 0 0 auto; }
   .rbtn .ico { font-size: 16px; line-height: 1.15; }
   .rbtn .lbl { font-size: 9.5px; line-height: 1.2; }
   .rbtn:hover { background: var(--panel3); color: var(--text); }
-  .rbtn.active { background: rgba(232,179,65,.14); color: var(--gold); }
+  .rbtn.active { background: #3a3a3c; color: #fff; }
+  .rbtn.active .ico { color: var(--gold); }
   /* 分组标题：纯视觉分隔，不可点。让一屏列全的同时保留分类语义 */
   .catTitle { font-size: 9px; color: var(--dim); letter-spacing: .5px;
     padding: 6px 4px 2px; text-align: center; opacity: .7;
@@ -170,7 +175,7 @@
   .ltSep { width: 34px; height: 1px; background: var(--line); margin: 4px 0;
     flex: 0 0 auto; }
   .ltBtn { position: relative; width: 58px; padding: 5px 0 4px;
-    background: transparent; border: none; border-radius: 7px;
+    background: transparent; border: none; border-radius: 4px;
     color: var(--dim); cursor: pointer; display: flex;
     flex-direction: column; align-items: center; gap: 1px;
     flex: 0 0 auto; }
@@ -371,7 +376,8 @@
   .sl .hdr { display: flex; justify-content: space-between; align-items: baseline;
     margin-bottom: 3px; }
   .sl .name { font-size: 12px; color: var(--text); }
-  .sl .val { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
+  .sl .val { font-variant-numeric: tabular-nums;
+    font-family: ui-monospace, Consolas, monospace; font-size: 11.5px; font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums;
     min-width: 30px; text-align: right; }
   .sl .val.mod { color: var(--gold); font-weight: 600; }
   .sl .reset { font-size: 10px; color: var(--dim); cursor: pointer;
@@ -385,12 +391,13 @@
     letter-spacing: .5px; }
   input[type=range] { width: 100%; -webkit-appearance: none; appearance: none;
     height: 3px; border-radius: 2px; background: var(--panel3); outline: none; }
-  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 13px;
-    height: 13px; border-radius: 50%; background: var(--gold); cursor: pointer;
-    border: 2px solid var(--bg); }
-  input[type=range]::-moz-range-thumb { width: 12px; height: 12px;
-    border-radius: 50%; background: var(--gold); cursor: pointer;
-    border: 2px solid var(--bg); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 11px;
+    height: 11px; border-radius: 2px; background: #cfcfcf; cursor: pointer;
+    border: none; }
+  input[type=range]::-webkit-slider-thumb:hover { background: #e8e8e8; }
+  input[type=range]::-moz-range-thumb { width: 11px; height: 11px;
+    border-radius: 2px; background: #cfcfcf; cursor: pointer;
+    border: none; }
   /* 白平衡轨道（截图里色温/色调是彩色渐变）：
      色温 蓝→暖，色调 绿→品红。渐变让"往哪边拖是变暖"不需要读数字。 */
   input[type=range].wb-temp { height: 5px; border-radius: 3px;
@@ -429,10 +436,10 @@
   .formula .slots input { width: 64px; background: var(--bg);
     border: 1px solid var(--line); color: var(--text); border-radius: 4px;
     padding: 3px 5px; font-size: 12px; }
-  .goldbtn { background: var(--gold); color: #141005; border: none;
-    border-radius: 6px; padding: 5px 16px; cursor: pointer; font-size: 12px;
-    font-weight: 700; }
-  .goldbtn:hover { background: #f2c55c; }
+  .goldbtn { background: #3d3d3f; color: #fff; border: 1px solid #55555a;
+    border-radius: 3px; padding: 5px 16px; cursor: pointer; font-size: 12px;
+    font-weight: 600; }
+  .goldbtn:hover { background: #48484a; border-color: #66666a; }
 
   /* 曲线编辑器 */
   #curveCanvas { width: 100%; height: 190px; background: #08080a;
@@ -444,8 +451,8 @@
   .chBtn { flex: 1; padding: 6px 0; border-radius: 5px; cursor: pointer;
     background: var(--panel3); border: 1px solid var(--line); font-size: 11px;
     color: var(--text); }
-  .chBtn.active { border-color: var(--gold); color: var(--gold);
-    background: rgba(232,179,65,.12); }
+  .chBtn.active { border-color: #5a5a5c; color: #fff;
+    background: #3a3a3c; }
 
   /* 批处理 */
   .batchRow { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
@@ -465,7 +472,8 @@
   .locItem { display: flex; align-items: center; gap: 6px; padding: 6px 8px;
     border: 1px solid var(--line); border-radius: 6px; margin-bottom: 5px;
     background: var(--panel2); cursor: pointer; font-size: 12px; }
-  .locItem.active { border-color: var(--gold); background: rgba(232,179,65,.10); }
+  .locItem.active { border-color: #5a5a5c; background: #333335; }
+  .locItem.active .nm { color: #fff; }
   .locItem .nm { flex: 1; }
   .locItem .del { color: var(--dim); cursor: pointer; padding: 0 4px; }
   .locItem .del:hover { color: var(--danger); }
@@ -503,7 +511,7 @@
   /* 色轮面板 */
   .wheelRow { display: flex; gap: 6px; margin-bottom: 12px; }
   .wheelBtn { flex: 1; padding: 8px 0; border: 2px solid transparent;
-    border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600;
+    border-radius: 4px; color: #fff; font-size: 12px; font-weight: 600;
     cursor: pointer; opacity: .5; }
   .wheelBtn.active { opacity: 1; border-color: var(--gold); }
 
@@ -654,9 +662,10 @@
   #welcome ol { margin: 0 0 10px; padding-left: 20px; color: var(--dim);
     line-height: 1.9; }
   #welcome ol b { color: var(--text); font-weight: 500; }
-  #welcome .go { width: 100%; padding: 8px 0; border-radius: 8px;
-    border: none; background: var(--gold); color: #111; font-size: 13px;
-    font-weight: 600; cursor: pointer; }
+  #welcome .go { width: 100%; padding: 8px 0; border-radius: 3px;
+    border: 1px solid #55555a; background: #3d3d3f; color: #fff;
+    font-size: 13px; font-weight: 600; cursor: pointer; }
+  #welcome .go:hover { background: #48484a; }
   #welcome .tip { color: var(--dim); font-size: 11px; margin-top: 8px;
     text-align: center; }
   @media (max-width: 860px) { #welcome { width: calc(100vw - 24px);
@@ -683,7 +692,7 @@
       <button class="tbtn" id="btnToggleBox" title="在预览上显示/隐藏人脸检测框（默认关）"><span class="ico">🖄</span>人脸框</button>
     </div>
     <div class="tgroup">
-      <button class="tbtn" id="btnAuto" disabled title="一键自动初修：曝光/色彩/磨皮一次到位"><span class="ico">✨</span>自动</button>
+      <button class="tbtn" id="btnAuto" disabled title="一键自动初修：曝光/色彩/磨皮一次到位"><span class="ico">✦</span>自动</button>
       <button class="tbtn" id="btnHeal" disabled title="污点修复：点一下斑点/痘痘自动愈合"><span class="ico">◍</span>修复</button>
       <button class="tbtn" id="btnStamp" disabled title="仿制图章：按住 Alt 取源，涂抹复制区域"><span class="ico">⊞</span>图章</button>
       <button class="tbtn" id="btnErase" disabled title="智能消除：涂掉杂物/路人，AI 自动填充背景"><span class="ico">✦</span>消除</button>
@@ -1472,7 +1481,7 @@ const SPECIAL_ICONS = {
   '配置文件': '☰',
   '滤镜': '⚗', '后调色': '◔', '背景消除': '▤', '换天空': '☁',
   '补草地': '⌡', '去道具': '⊥', '四季背景': '❀', '证件照': '▣',
-  'AI 布景': '✨', '创成式填充': '༻', '道具修复': '⚕', '溶图': '⧉',
+  'AI 布景': '✦', '创成式填充': '༻', '道具修复': '⚕', '溶图': '⧉',
   '宠物修整': '❋',
   '表情管理': '☺', '妆容调整': '✿', '头发调整': '≋', '衣物': '⬒',
   '祛边': '⧗', '历史': '⏱', '联机': '⌾', '配方': '⑃', '批处理': '⧉',
@@ -5798,7 +5807,7 @@ function renderBgClean() {
     '<input type="checkbox" id="bgcKeepLight" checked>' +
     '<span>保留原背景明暗</span></label></div>' +
     '<div class="batchRow">' +
-    '<button class="chip" id="bgcImgBtn">🖼 自定义图片背景…</button>' +
+    '<button class="chip" id="bgcImgBtn">⧉ 自定义图片背景…</button>' +
     '<input type="file" id="bgcImgFile" accept="image/*" style="display:none">' +
     '<span class="bstat" id="bgcImgName" style="flex:1"></span></div>';
   wrap.appendChild(rep);
@@ -9046,7 +9055,7 @@ function showWelcomeOnce() {
   const w = document.createElement('div');
   w.id = 'welcome';
   w.innerHTML =
-    '<h2>欢迎使用 炸金文谦蛋糕</h2>' +
+    '<h2 style="color:var(--text)">欢迎使用 炸金文谦蛋糕</h2>' +
     '<ol>' +
       '<li><b>导入照片</b> — 拖进窗口或点「打开」</li>' +
       '<li><b>右侧滑杆</b>调光影色彩</li>' +
@@ -9224,13 +9233,15 @@ function showHome() {
   if (S.session) return;                    // 有图在手不再显示
   if (CURRENT_MODE !== 'retouch') return;   // 图库/创意模块有自己的界面
   if (document.getElementById('homeScreen')) return;
+  // 图标用单色字形（专业修图软件惯例），不用彩色 emoji——彩色 emoji
+  // 是"AI 生成感"的主要来源之一。
   const CARDS = [
-    ['hOpen',    '🖼', '打开照片',   'JPG / PNG / RAW，拖拽或选择'],
-    ['hLib',     '🗂', '图库 · 批量', '导入文件夹，套配方批量出片'],
-    ['hTether',  '📷', '联机拍摄',   '相机联机，拍一张修一张'],
+    ['hOpen',    '⧉', '打开照片',   'JPG / PNG / RAW，拖拽或选择'],
+    ['hLib',     '▦', '图库 · 批量', '导入文件夹，套配方批量出片'],
+    ['hTether',  '⌾', '联机拍摄',   '相机联机，拍一张修一张'],
     ['hCull',    '★', '挑图选片',   'AI 评分排序，快速选片'],
-    ['hCreative','✨', '生成式 AI',  'AI 布景 / 创成式填充'],
-    ['hBatch',   '⚡', '一键精修',   '磨皮液化调色，一秒初修'],
+    ['hCreative','✦', '生成式 AI',  'AI 布景 / 创成式填充'],
+    ['hBatch',   '◈', '一键精修',   '磨皮液化调色，一秒初修'],
   ];
   const el = document.createElement('div');
   el.id = 'homeScreen';
