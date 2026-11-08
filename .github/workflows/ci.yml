@@ -48,10 +48,13 @@ jobs:
       # （其余套件需要 Chrome CDP、ComfyUI 或本机照片，只能在开发机上跑）
       - name: 引擎回归
         run: |
+          # verify_landmarks 已退役：它专测 2d106det（insightface 系，
+          # 2026-11-07 从发行移除——许可仅限研究/非商业）。关键点功能
+          # 现走 geoface（5 点+解剖比例）与 meshface（MediaPipe 468 点）。
           $suites = @(
             "verify_clip_onnx", "verify_curves", "verify_eyes",
             "verify_formula", "verify_geoface", "verify_clothes",
-            "verify_landmarks", "verify_locality", "verify_psunits",
+            "verify_locality", "verify_psunits",
             "verify_skin_gate", "verify_wheel"
           )
           $fail = 0
