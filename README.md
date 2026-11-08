@@ -39,12 +39,10 @@
 
 ## 快速开始
 
-**方式 A · 普通用户**：到 [Releases](https://github.com/wmc-ccb/ZhaJinWenQianCake/releases) 下载发行包，解压后**双击 `ZhaJinWenQianCake.exe`** 即可，无需安装任何东西。两个版本任选：
+**方式 A · 普通用户**：到 [Releases](https://github.com/wmc-ccb/ZhaJinWenQianCake/releases) 下载发行包（分卷 zip + 合并.bat + SHA256 清单），解压后**双击 `ZhaJinWenQianCake.exe`** 即可，无需安装任何东西。
 
-| 版本 | 体积 | 适合 |
-|---|---|---|
-| **lite** | ~5.2 GB | 网速好：首次启动自动联网下载模型（980MB，带进度条和断点续传，之后永久离线） |
-| **full** | ~6.5 GB | 想一次到位：模型全部内置，解压即用 |
+- 程序包约 5 GB；**AI 模型（约 1 GB）在首次启动时后台自动下载**（带进度条、断点续传），下载完永久离线使用
+- 之后的新版本可在应用内**一键更新**（关于面板），不用重新下载安装包
 
 **方式 B · 从源码跑**（需要先装 [Python 3.11-3.13](https://www.python.org/downloads/)，勾选 Add to PATH）：
 

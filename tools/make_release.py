@@ -193,29 +193,27 @@ def main():
     if not args.skip_build:
         build()
 
-    full = zip_version("full")
+    # 分发已收敛为**单包**（lite 形态：程序本体 + 模型首启下载）。
+    # full 变体（内置 6GB 模型）不再生产——模型走 GitHub 首启下载，
+    # 更新也只走 lite 卷（updater 固定）。
     lite = zip_version("lite")
-
-    full_files = prepare_release_dir("full", full)
     lite_files = prepare_release_dir("lite", lite)
 
     # 合并回环校验：拼回后 sha 必须等于原 zip
-    for variant, zip_path, files in (("full", full, full_files),
-                                     ("lite", lite, lite_files)):
-        parts = [f for f in files if f.endswith((".001", ".002", ".003"))]
-        merged = os.path.join(DIST_DIR, "release-" + variant,
-                              "merged_" + os.path.basename(zip_path))
-        with open(merged, "wb") as o:
-            for p in sorted(parts):
-                with open(p, "rb") as fh:
-                    shutil.copyfileobj(fh, o)
-        if sha256(merged) != sha256(zip_path):
-            raise SystemExit("合并回环校验失败: " + variant)
-        os.remove(merged)
-        print("[校验] %s 卷合并回环 OK" % variant)
+    parts = [f for f in lite_files if f.endswith((".001", ".002", ".003"))]
+    merged = os.path.join(DIST_DIR, "release-lite",
+                          "merged_" + os.path.basename(lite))
+    with open(merged, "wb") as o:
+        for p in sorted(parts):
+            with open(p, "rb") as fh:
+                shutil.copyfileobj(fh, o)
+    if sha256(merged) != sha256(lite):
+        raise SystemExit("合并回环校验失败: lite")
+    os.remove(merged)
+    print("[校验] lite 卷合并回环 OK")
 
     if args.upload:
-        upload(args.upload, full_files + lite_files)
+        upload(args.upload, lite_files)
         print("上传完成。")
 
     print("\nRESULT: RELEASE PACKAGE READY")

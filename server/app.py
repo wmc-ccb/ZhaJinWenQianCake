@@ -65,7 +65,7 @@ PREVIEW_LONG_EDGE = 1400
 # 发布流程（tools/assemble_dist.py 与 README「发布」章节）以这里为准。
 # VERSION 每次发版手动改；BUILD 优先级：环境变量 > exe 旁的 build-stamp.txt
 # （打包时写入，形如 2026-10-24.1）> dev（源码运行）。
-APP_VERSION = "1.1.0"
+APP_VERSION = "1.2.0"
 
 
 def _read_build() -> str:
@@ -1496,21 +1496,17 @@ def update_check():
         return JSONResponse({"supported": False, "reason": "network",
                              "error": str(e)[:120],
                              "current": APP_VERSION})
-    variant = "lite"
-    try:
-        models_sub = os.path.join(UP.app_dir(), "models")
-        has_models = os.path.isdir(models_sub) and os.listdir(models_sub)
-        variant = "full" if has_models else "lite"
-    except Exception:
-        pass
-    pick = UP.pick_assets(rel["assets"], variant)
+    # 分发模式已收敛为**单包**（程序包统一 lite 形态，模型首启单独
+    # 下载）——不再有 full 变体。此前按 models/ 目录是否非空猜变体，
+    # 用户下完模型后会被误判成 full，去找不存在的 full 卷导致无法更新。
+    pick = UP.pick_assets(rel["assets"], "lite")
     total = sum(a["size"] for a in pick["volumes"]) if pick else 0
     return JSONResponse({
         "supported": True,
         "current": APP_VERSION,
         "latest": rel["tag"],
         "available": UP.newer(rel["tag"], APP_VERSION),
-        "variant": variant,
+        "variant": "lite",
         "pick": {"volumes": [a["name"] for a in pick["volumes"]],
                  "total_bytes": total,
                  "sha_name": pick["sha_name"]} if pick else None,
@@ -1519,27 +1515,27 @@ def update_check():
 
 
 class UpdateDownloadRequest(BaseModel):
-    variant: str = "lite"          # full | lite
+    variant: str = "lite"          # 兼容旧客户端；服务端固定按 lite 卷走
 
 
 @app.post("/api/update/download")
 def update_download(req: UpdateDownloadRequest):
-    """后台下载指定变体的分卷组（断点续传 + SHA256），返回 job id."""
+    """后台下载分卷组（断点续传 + SHA256），返回 job id."""
     from engine import updater as UP
     from engine.paths import is_msix
 
     if is_msix():
         raise HTTPException(403, "商店版不支持应用内更新")
-    if req.variant not in ("full", "lite"):
-        raise HTTPException(400, "variant 必须是 full 或 lite")
+    # 单包分发：无论客户端传什么 variant，固定按 lite 卷（程序包统一
+    # lite 形态，模型走首启下载的另一条线）
     try:
         rel = UP.latest()
     except Exception as e:
         raise HTTPException(502, "GitHub 查询失败: %s" % str(e)[:120])
-    pick = UP.pick_assets(rel["assets"], req.variant)
+    pick = UP.pick_assets(rel["assets"], "lite")
     if not pick:
         raise HTTPException(404, "Release 上没有 %s 变体的分卷组"
-                           % req.variant)
+                           % "lite")
     stage = UP.stage_dir()
     free = UP.free_gb(stage)
     total_gb = sum(a["size"] for a in pick["volumes"]) / 1024 ** 3
@@ -1557,7 +1553,7 @@ def update_download(req: UpdateDownloadRequest):
         except Exception:
             sha_map = {}               # 没有清单也能下（只校验大小）
     job_id = uuid.uuid4().hex[:12]
-    state = {"phase": "downloading", "variant": req.variant,
+    state = {"phase": "downloading", "variant": "lite",
              "latest": rel["tag"], "pct": 0, "bytes_done": 0,
              "bytes_total": sum(a["size"] for a in pick["volumes"]),
              "vol": 0, "n_vols": len(pick["volumes"]), "error": "",
