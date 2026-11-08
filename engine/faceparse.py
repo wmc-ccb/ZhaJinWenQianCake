@@ -80,9 +80,20 @@ def model_path() -> str:
 
 
 def available() -> bool:
-    # config.json is what the loader needs; weights alone are not enough
-    return (os.path.exists(os.path.join(model_dir(), "config.json")) and
-            os.path.exists(model_path()))
+    """人脸解析功能是否可用：SegFormer（faceparsing 权重）或 mesh 后端
+    （face_landmarker.task，Apache-2.0）任一存在即可。
+
+    商用部署不带 faceparsing/ 权重时，本函数仍返回 True——parse() 内部
+    会路由到 mesh 几何蒙版。这样 skintone/automask 等消费方不需要为
+    后端差异写分支。"""
+    if os.path.exists(os.path.join(model_dir(), "config.json")) and \
+            os.path.exists(model_path()):
+        return True
+    try:
+        from . import meshface as MF
+        return MF.available()
+    except Exception:
+        return False
 
 
 def _pipeline():
@@ -167,7 +178,23 @@ def parse(img: np.ndarray, size: int = 512,
     like a bug in something else.
     """
     global _CACHED
-    if not available():
+    # ---- 后端路由（有权重用权重，没权重用 mesh）----
+    # SegFormer（faceparsing 权重）：研究/非商业许可，精度高；
+    # mesh（face_landmarker.task）：Apache-2.0，商用安全，几何蒙版。
+    # 商用部署不带权重目录 → 自动路由到 mesh。此前把 mesh 回路写在
+    # available()=False 分支里，而 available() 被 mesh 兜底成永远
+    # True，路由形同虚设（验收实测踩到）。
+    segformer_ready = (os.path.exists(os.path.join(model_dir(),
+                                                   "config.json")) and
+                       os.path.exists(model_path()))
+    if not segformer_ready:
+        from . import meshface as MF
+
+        if MF.available():
+            try:
+                return MF.parse(img, face_box=face_box)
+            except Exception:
+                return None
         return None
     # The cache key has to include the crop, not just the array identity: a
     # caller that first parses the whole frame and then asks for a face crop

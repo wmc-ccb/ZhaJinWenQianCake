@@ -142,9 +142,14 @@ class Landmark106:
 
         path = model_path()
         if not os.path.exists(path):
+            # 2d106det 已从发行包移除（insightface 权重仅限研究/非商业；
+            # 且 geoface.py 实测其点不是标准语义关键点，核心功能本就走
+            # 5 点+解剖比例的几何方案）。妆容/液化功能回退到 geoface——
+            # 所有消费方（liquify 瘦鼻/嘴宽/下巴）都有盒回退分支。
             raise FileNotFoundError(
-                f"landmark model not found at {path}. Download 2d106det.onnx "
-                "into the models/ directory.")
+                f"landmark model not found at {path}. The 2d106det model "
+                "was removed from distribution (license); the pipeline "
+                "falls back to geometric masks (geoface).")
         # the CUDA provider needs the runtime DLLs that torch bundles
         try:
             from .matting import _prepare_gpu_dlls

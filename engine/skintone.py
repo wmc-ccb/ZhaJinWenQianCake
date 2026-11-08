@@ -15,6 +15,7 @@
 """
 from __future__ import annotations
 
+import os
 from typing import Optional, Tuple
 
 import cv2
@@ -26,11 +27,19 @@ def skin_mask(img: np.ndarray) -> Optional[np.ndarray]:
     try:
         from . import faceparse as FP
         if FP.available():
-            m = FP.mask(img)
-            # faceparse 输出部位 id 表；不同实现里皮肤 id 不同，
-            # 这里取"既非背景非头发非衣服"的最大类，保守而稳健
-            if m is not None and m.ndim == 2:
-                return np.clip(m.astype(np.float32), 0, 1)
+            # SegFormer 后端（faceparsing 权重在）：整幅最大类语义
+            if os.path.exists(os.path.join(FP.model_dir(), "config.json")):
+                m = FP.mask(img)
+                # faceparse 输出部位 id 表；不同实现里皮肤 id 不同，
+                # 这里取"既非背景非头发非衣服"的最大类，保守而稳健
+                if m is not None and m.ndim == 2:
+                    return np.clip(m.astype(np.float32), 0, 1)
+            # mesh 后端（权重缺席，商用路径）：六组里的 skin
+            parts = FP.parse(img)
+            if parts is not None:
+                m = parts.masks.get("skin")
+                if m is not None and m.ndim == 2:
+                    return np.clip(m.astype(np.float32), 0, 1)
     except Exception:
         pass
     # 回退：YCbCr Cr∈[133,180] ∧ HSV 约束（经典规则，对黄种人偏保守）

@@ -5,15 +5,10 @@
 
 ## 近期（1~2 个月）
 
-- [ ] **模型许可边界清理**：insightface 系模型（106 关键点/面部解析）
-  仅限研究用途，寻找并替换为可商用许可的等价模型（候选：
-  MediaPipe Face Mesh 系 / 开源人脸解析模型），解除商用障碍
-- [ ] **代码签名**：为 Windows 发行包接入正式代码签名（候选：
-  Certum 开源开发者证书 / SignPath 开源计划 / Azure Trusted
-  Signing），消除 SmartScreen 告警
-- [ ] **README 截图与演示 GIF**：真实界面截图 + 前后对比
-- [ ] **英文 README**：面向国际用户的完整文档
-- [ ] **模型分发瘦身**：继续压缩 lite 包体积与首启下载体验
+- [x] **模型许可边界清理**（2026-11-07）：insightface 系模型已从发行包
+  移除；关键点/面部解析改用 MediaPipe Face Landmarker（Apache-2.0，
+  engine/meshface.py 几何蒙版）。仍有权重的本地用户自动优先 SegFormer
+  后端（精度优先，自用场景）。
 
 ## 中期（3~6 个月）
 

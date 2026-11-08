@@ -15,14 +15,14 @@
 | hand_landmarker.task | 手部检测 | google/mediapipe | Apache-2.0 |
 | RealESRGAN_x4plus.pth | 超分辨率 | xinntao/Real-ESRGAN | BSD-3-Clause |
 | clip_image_encoder.onnx | LaMa 配套编码器 | 随 big-lama 发行 | Apache-2.0 |
-| 2d106det.onnx | 106 人脸关键点 | insightface 模型库 | **研究/非商业**（见注 1） |
-| faceparsing/model.safetensors | 面部解析 | insightface 模型库 | **研究/非商业**（见注 1） |
+| face_landmarker.task | 人脸关键点/面部解析 | google/mediapipe | Apache-2.0 |
 | denoise.pt | AI 降噪 | **本项目自训**（训练数据 DIV2K，见注 2） | 随项目许可 |
 
-> **注 1**：insightface（deepinsight/insightface）代码为 MIT，但其**官方预训练模型**
-> 注明仅供研究/学术等非商业用途。本项目的分发遵循该限制；任何商业使用
-> 需自行向权利方获得授权。这是当前最重要的许可边界，替换为可商用模型
-> 在路线图中。
+> **注 1**：insightface 系模型（2d106det / faceparsing）已于 2026-11-07
+> **从发行包移除**——其预训练许可仅限研究/非商业，与项目的商用友好目标
+> 冲突。替代：关键点/面部解析改用 MediaPipe Face Landmarker（Apache-2.0，
+> engine/meshface.py 几何蒙版）。仍有 faceparsing 权重的本地用户可继续
+> 自用（parse 自动优先 SegFormer 后端），但分发不再包含。
 >
 > **注 2**：denoise.pt 为本项目使用 DIV2K 公开数据集自行训练的权重。
 > DIV2K 数据集来自 Flickr 图像，遵循其官方发布条款用于研究用途。
