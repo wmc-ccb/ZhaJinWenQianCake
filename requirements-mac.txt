@@ -1,0 +1,19 @@
+# macOS 依赖集（在 mac 上安装/构建用；Windows 用 requirements.txt）
+# 差异说明：
+#  - torch：mac 用 CPU/MPS 轮子（无 CUDA）；superres/降噪在 mac 上走 CPU
+#    推理（MPS 后端留待后续验证），速度低于 Windows GPU 但功能等价
+#  - onnxruntime：标准轮子即含 mac 支持
+#  - 不装 pywin32 / windows 专属项
+torch
+torchvision
+fastapi
+uvicorn
+onnxruntime
+opencv-python
+mediapipe
+numpy
+pillow
+rawpy
+pywebview
+huggingface_hub
+requests

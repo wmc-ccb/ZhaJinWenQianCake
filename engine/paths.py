@@ -59,9 +59,19 @@ def app_dir() -> str:
 
     与 home() 的区别：home 是"可写运行时根"（MSIX 下切到
     LOCALAPPDATA），app_dir 永远指向安装目录——一键更新器要用它
-    定位被替换的 exe 与解压目标。
+    定位被替换的可执行文件与解压目标。
     """
     return _exe_dir()
+
+
+def app_executable() -> str:
+    """主可执行文件完整路径（跨平台：Windows exe / macOS .app 内二进制）。"""
+    if is_frozen():
+        # 打包态：PyInstaller 的引导可执行文件本身（macOS 在
+        # <pkg>.app/Contents/MacOS/ 下，Windows 是 ZhaJinWenQianCake.exe）
+        return os.path.abspath(sys.executable)
+    name = "ZhaJinWenQianCake.exe" if sys.platform == "win32"         else "ZhaJinWenQianCake"
+    return os.path.join(_exe_dir(), name)
 
 
 def home() -> str:
