@@ -1,5 +1,16 @@
 # macOS 构建与运行指南
 
+## 架构支持：仅 Apple Silicon（M1/M2/M3/M4 = arm64）
+
+PyPI 生态已退役 macOS x86_64 轮子（实测 2026-11-11：torch 2.15 /
+onnxruntime 1.31 / mediapipe 1.2 / rawpy 最新版均**只有 arm64**）——
+Intel Mac（x86_64）只能锁旧版依赖，越走越窄，本项目不支持。
+Apple Silicon 上源码直跑与打包（CI 产出）均为原生 arm64。
+
+CI runner 现状（2026-11-11）：macos-14-arm64 池对当前账户返回
+"configuration not supported"；macos-13（x64）排 24h 未分配（且生态
+已不支持 x86）；macos-15-arm64 **接受排队**（构建中）。
+
 Windows 是第一平台（全部功能在本机开发验证）；macOS 为移植平台，
 构建走 **GitHub Actions macos-14 云端**（PyInstaller 不支持跨平台，
 本机是 Windows 无法本地出 mac 包）。
