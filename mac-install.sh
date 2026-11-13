@@ -15,7 +15,11 @@ say() { printf '\n\033[1;33m==> %s\033[0m\n' "$*"; }
 
 say "1/4 检查 uv（Python 环境管理器）"
 if ! command -v uv >/dev/null 2>&1; then
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  # 安装器落盘后执行，不用 curl|sh 直管道（远程脚本无审查直接执行
+  # 是供应链风险——落盘让用户有机会先看内容）
+  curl -LsSf https://astral.sh/uv/install.sh -o /tmp/uv-installer.sh
+  sh /tmp/uv-installer.sh
+  rm -f /tmp/uv-installer.sh
   export PATH="$HOME/.local/bin:$PATH"
 fi
 uv --version
