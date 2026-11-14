@@ -10,8 +10,9 @@ rem
 rem  做的事：
 rem    1. 找 Python（3.11-3.13），没有就提示去装
 rem    2. 在 .venv 里建独立环境（不污染系统 Python）
-rem    3. 安装全部依赖（约 500MB，一次性）
-rem    4. 从本仓库 Release 下载全部模型（980MB）并校验
+rem    3. 安装全部依赖（含自动选择 CUDA/CPU 版 PyTorch）
+rem    4. 检测 NVIDIA 显卡：自动选择 CUDA/CPU 版 PyTorch
+rem    5. 从本仓库 Release 下载全部模型（980MB）并校验
 rem    5. 完成后双击 ZhaJinWenQianCake.bat 启动
 rem ============================================================
 
@@ -60,8 +61,13 @@ if not exist ".venv\Scripts\python.exe" (
 )
 set "VPY=%~dp0.venv\Scripts\python.exe"
 
-rem ---- 3. 装依赖 ----
-echo  [3/4] 安装依赖（约 500MB，几分钟，只做一次）...
+rem ---- 3. 装依赖（NVIDIA 显卡自动装 CUDA 版 PyTorch，否则 CPU 版）----
+echo  [3/5] 检测显卡...
+set "GPU=CPU"
+where nvidia-smi >nul 2>&1
+if not errorlevel 1 set "GPU=CUDA"
+echo  检测结果: %GPU%
+echo  [4/5] 安装依赖（首次约 1-3GB，几分钟，只做一次）...
 "%VPY%" -m pip install -q --upgrade pip
 "%VPY%" -m pip install -r requirements.txt
 if errorlevel 1 (
@@ -69,9 +75,27 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+rem ---- 3.5 PyTorch（生成式/超清/降噪的推理引擎）----
+if "%GPU%"=="CUDA" (
+  echo  检测到 NVIDIA 显卡：安装 CUDA 版 PyTorch（约 2.5GB，GPU 加速超清/降噪/生成式）...
+  "%VPY%" -m pip install torch==2.11.0 torchvision==0.26.0 --index-url https://download.pytorch.org/whl/cu128
+) else (
+  echo  未检测到 NVIDIA 显卡：安装 CPU 版 PyTorch（功能等价，推理速度较慢）...
+  "%VPY%" -m pip install torch==2.11.0 torchvision==0.26.0
+)
+if errorlevel 1 (
+  echo  PyTorch 安装失败。检查网络后重试。
+  pause
+  exit /b 1
+)
+if errorlevel 1 (
+  echo  依赖安装失败。检查网络后重新双击本文件（会跳过已完成的步骤）。
+  pause
+  exit /b 1
+)
 
 rem ---- 4. 模型 ----
-echo  [4/4] 检查/下载模型（980MB，断点续传）...
+echo  [5/5] 检查/下载模型（980MB，断点续传）...
 "%VPY%" -X utf8 tools\fetch_models.py
 if errorlevel 1 (
   echo  模型下载失败。检查网络后重新双击本文件（已下好的不会重下）。

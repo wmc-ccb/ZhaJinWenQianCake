@@ -37,6 +37,21 @@
 
 > 示例照片来自 picsum.photos（免费图库许可）。
 
+## 硬件适配（如实声明）
+
+| 硬件 | 状态 |
+|---|---|
+| NVIDIA GPU（RTX/GTX，4GB+ 显存） | ✅ 完整 GPU 加速（超清/降噪/生成式），一键安装自动识别 |
+| 无 NVIDIA 显卡 / 集显 | ✅ 功能完整，AI 推理走 CPU（速度约为 GPU 的 1/10，一键安装自动选择） |
+| CPU | x64（2013 年后的主流 CPU 均支持）；Windows ARM 未测试 |
+| 内存 | 建议 16GB（8GB 可用但超清大图时较紧张） |
+| 磁盘 | 3GB（程序+环境+模型） |
+| 系统 | Windows 10 1809+ / Windows 11（WebView2 依赖）；不支持 Win7 |
+| macOS | 仅 Apple Silicon（M1-M4），见 [BUILD-MAC.md](BUILD-MAC.md)；Intel Mac 不支持 |
+| 显示 | 高分屏/150% 缩放正常（WebView2 自适应）；触屏未实测 |
+| RAW 相机 | NEF/CR2/CR3/ARW/RAF/DNG 等主流格式（LibRaw） |
+| 联机拍摄 | 佳能（EDSDK，Windows）/ 通用 PTP |
+
 ## 快速开始
 
 **方式 A · 普通用户**：到 [Releases](https://github.com/wmc-ccb/ZhaJinWenQianCake/releases) 下载发行包（分卷 zip + 合并.bat + SHA256 清单），解压后**双击 `ZhaJinWenQianCake.exe`** 即可，无需安装任何东西。
