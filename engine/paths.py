@@ -176,3 +176,31 @@ def register_cuda_dlls() -> bool:
         except Exception:
             pass
     return added
+
+
+def torch_device() -> str:
+    """全引擎统一的 PyTorch 设备选择：cuda -> mps(Apple Silicon) -> cpu.
+
+    为什么集中在这里：此前 4 个模块各自写 `cuda if available else cpu`，
+    Apple Silicon 的 MPS 加速没有入口（mac 用户全部落 CPU）。统一后：
+      - NVIDIA: cuda（Windows 打包版已验证）
+      - Apple Silicon: mps（PyTorch 原生后端；实验性——个别算子在 MPS
+        上可能与 CUDA/CPU 有数值差异，调用方首次前向失败时应回落 cpu）
+      - 其余/RETOUCHLAB_MPS=0 显式关闭: cpu
+    本函数只做选择，不做任何 .to()——模型搬运与失败回落由调用方负责。
+    """
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        mps = getattr(torch.backends, "mps", None)
+        if mps is not None and os.environ.get("RETOUCHLAB_MPS", "1") != "0":
+            try:
+                if mps.is_available():
+                    return "mps"
+            except Exception:
+                pass
+    except Exception:
+        pass
+    return "cpu"

@@ -23,7 +23,7 @@ bash mac-install.sh
 
 | 项 | 现状 |
 |---|---|
-| **GPU 加速** | superres/降噪走 CPU 推理（MPS 未验证），速度低于 Windows GPU |
+| **GPU 加速** | **Apple Silicon MPS 加速已接入**（torch_device 统一选择 cuda→mps→cpu；实验性——个别算子数值差异或首次前向失败时自动回落 CPU。可用 `RETOUCHLAB_MPS=0` 强制关闭） |
 | **应用内一键更新** | 检测/下载可用；「安装并重启」自动解压待 mac 实机验证，建议手动重下模型外的更新包或 git pull |
 | **联机拍摄** | Windows EDSDK 优先；mac 走通用协议，未实测 |
 | **打包 .app** | GitHub Actions 免费档 mac runner 长时间排队（实测三次 24h 超时），.app 分发暂缓；付费 larger runner 或租云 Mac 可解 |

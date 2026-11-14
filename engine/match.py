@@ -82,7 +82,8 @@ def _clip():
         import torch
         from transformers import CLIPModel, CLIPProcessor
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        from .paths import torch_device
+        device = torch_device()
 
         def build(**kw):
             m = CLIPModel.from_pretrained(_CLIP_NAME, **kw)

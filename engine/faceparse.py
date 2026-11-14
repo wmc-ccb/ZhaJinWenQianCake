@@ -113,8 +113,8 @@ def _pipeline():
 
 def _cuda_ok() -> bool:
     try:
-        import torch
-        return bool(torch.cuda.is_available())
+        from .paths import torch_device
+        return torch_device() in ("cuda", "mps")
     except Exception:
         return False
 

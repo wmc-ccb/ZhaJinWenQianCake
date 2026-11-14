@@ -72,7 +72,13 @@ def _load():
         model = Denoiser(width=int(ck.get("width", 32)),
                          depth=int(ck.get("depth", 3)))
         model.load_state_dict(ck["state_dict"])
-        device = "cuda" if torch.cuda.is_available() else "cpu"
+        from .paths import torch_device
+        device = torch_device()
+        if device == "mps":
+            try:
+                _ = torch.zeros(1, device=device)
+            except Exception:
+                device = "cpu"
         model = model.to(device).eval()
         _SESSION["model"] = model
         _SESSION["device"] = device

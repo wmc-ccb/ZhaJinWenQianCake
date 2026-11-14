@@ -138,7 +138,13 @@ def _load():
                 break
     net.load_state_dict(state, strict=True)
     net.eval()
-    dev = "cuda" if torch.cuda.is_available() else "cpu"
+    from .paths import torch_device
+    dev = torch_device()
+    if dev == "mps":
+        try:
+            _ = torch.zeros(1, device=dev)      # MPS 首次探测：算子不兼容时回落
+        except Exception:
+            dev = "cpu"
     net = net.to(dev)
     if dev == "cuda":
         try:
