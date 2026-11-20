@@ -5425,7 +5425,8 @@ function renderLibrary() {
     'gap:4px;margin-top:6px;max-height:52vh;overflow-y:auto';
   if (!vis.length) {
     grid.innerHTML = '<div class="bstat" style="grid-column:1/-1">' +
-      (LIB.path ? '该文件夹没有照片' : '先导入一个照片文件夹') + '</div>';
+      (LIB.path ? '该文件夹没有照片' : '先导入一个照片文件夹（建议固定用 D:\照片 仓库，' +
+        '按 年-月_主题 分批，RAW/成品/交付 三个子目录——避免目录一挪全断链）') + '</div>';
   } else {
     grid.innerHTML = vis.map((it, i) => {
       const idx = LIB.items.indexOf(it);
