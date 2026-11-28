@@ -1,0 +1,33 @@
+name: 商业授权与影楼定制咨询
+description: 咨询 ZhaJinWenQianCake 闭源/OEM 商业授权、影楼多机部署或预设定制包
+title: "[商业授权] "
+labels: ["commercial"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢关注 **炸金文谦蛋糕（ZhaJinWenQianCake）**。
+        源代码采用 **AGPL-3.0 + 商业双轨**：开源自用与合规衍生免费；闭源集成、去署名、OEM 打包或影楼/机构批量技术支持需购买商业授权。
+  - type: dropdown
+    id: tier
+    attributes:
+      label: 意向方案
+      options:
+        - 单机构 / 影楼永久买断授权 + 远程部署指导（¥299 起）
+        - 闭源 OEM / SaaS 二次开发商业授权（议价）
+        - 专属场照/婚纱预设包与工作流定制
+    validations:
+      required: true
+  - type: input
+    id: contact
+    attributes:
+      label: 您的联系邮箱或微信（方便回传报价与授权文件）
+      placeholder: name@studio.com
+    validations:
+      required: true
+  - type: textarea
+    id: details
+    attributes:
+      label: 需求说明（机器数量 / 显卡型号 / 业务场景）
+    validations:
+      required: false

@@ -1246,8 +1246,9 @@ Lanczos4 在整数偏移处是精确恒等，所以：
 ## 许可与用途
 
 **源代码**：[AGPL-3.0](LICENSE) + 商业双轨——开源使用遵循 AGPL-3.0
-（含网络服务同源开放义务）；闭源/OEM 商业集成请通过 Issues 联系
-作者购买商业授权。
+（含网络服务同源开放义务）；闭源/OEM 商业集成或影楼批量商用授权请通过
+[商业授权咨询表](https://github.com/wmc-ccb/ZhaJinWenQianCake/issues/new?template=commercial_license.yml)
+联系作者购买授权（v1.2.0 起发行包全部模型已解除商用限制）。
 
 全部代码原创，使用公开算法与公开模型：引导滤波（ECCV 2010）、频率分离、
 YuNet（Apache-2.0）、insightface 关键点/解析模型（**研究/非商业**）、
